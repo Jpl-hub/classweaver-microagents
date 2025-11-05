@@ -1,0 +1,72 @@
+@page {
+  size: A4;
+  margin: 16mm;
+}
+
+body.printable {
+  font-family: "Segoe UI", Arial, sans-serif;
+  color: #1f2937;
+  line-height: 1.6;
+}
+
+header {
+  margin-bottom: 24px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+header h1 {
+  font-size: 1.8rem;
+  margin: 0 0 8px;
+}
+
+section {
+  margin-bottom: 24px;
+}
+
+section h2 {
+  font-size: 1.3rem;
+  margin-bottom: 12px;
+  color: #111827;
+}
+
+ul,
+ol {
+  padding-left: 1.25rem;
+}
+
+.quiz-item {
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 12px;
+  background: #f9fafb;
+}
+
+.quiz-item header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+}
+
+.quiz-item h3 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.qid {
+  font-weight: 600;
+  color: #2563eb;
+}
+
+.answer {
+  font-weight: 600;
+  color: #047857;
+}
+
+.explain {
+  font-style: italic;
+  color: #374151;
+}

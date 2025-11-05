@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.py[cod]
+*$py.class
+
+# Django / SQLite
+*.sqlite3
+*.db
+*.db-journal
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Media / uploads / generated data
+media/
+data/
+!data/.gitkeep
+corpus/
+
+# Logs
+*.log
+logs/
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Node / frontend artifacts
+node_modules/
+webapp/node_modules/
+webapp/dist/
+webapp/.vite/
+
+# Coverage / test artefacts
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+.mypy_cache/
+
+# FAISS / embeddings
+*.index
+chunks.jsonl
+
