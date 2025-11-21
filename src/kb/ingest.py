@@ -1,7 +1,7 @@
 import io
 import uuid
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Dict, Iterable, List, Optional
 
 from django.conf import settings
 from django.db import transaction
@@ -76,6 +76,22 @@ def _chunk_text(text: str, chunk_size: int = 800, overlap: int = 120) -> List[st
     return chunks
 
 
+def _guess_filesize(file_obj: Any) -> Optional[int]:
+    size = getattr(file_obj, "size", None)
+    if isinstance(size, (int, float)):
+        return int(size)
+    if hasattr(file_obj, "seek") and hasattr(file_obj, "tell"):
+        current = file_obj.tell()
+        try:
+            file_obj.seek(0, io.SEEK_END)
+            end = file_obj.tell()
+            file_obj.seek(current)
+            return int(end)
+        except OSError:
+            file_obj.seek(current)
+    return None
+
+
 @transaction.atomic
 def ingest_documents(*, files: Iterable[Any]) -> Dict[str, Any]:
     """Ingest uploaded documents, create knowledge chunks, and persist embeddings."""
@@ -86,7 +102,7 @@ def ingest_documents(*, files: Iterable[Any]) -> Dict[str, Any]:
 
     chunk_records: List[Dict[str, Any]] = []
     chunk_texts: List[str] = []
-    documents_created: List[Tuple[str, str]] = []
+    documents_summary: List[Dict[str, Any]] = []
 
     for file_obj in files:
         if not file_obj:
@@ -102,18 +118,28 @@ def ingest_documents(*, files: Iterable[Any]) -> Dict[str, Any]:
 
         doc_id = uuid.uuid4().hex
         title = Path(name).stem
-        document, _created = KnowledgeDocument.objects.get_or_create(
-            doc_id=doc_id,
-            defaults={
-                "title": title,
-                "source_path": name,
-                "metadata": {"length": len(text)},
-            },
-        )
-        if _created:
-            documents_created.append((doc_id, title))
-
         chunks = _chunk_text(text)
+        metadata = {
+            "length": len(text),
+            "size_bytes": _guess_filesize(file_obj),
+            "chunk_count": len(chunks),
+            "source": name,
+        }
+        document = KnowledgeDocument.objects.create(
+            doc_id=doc_id,
+            title=title,
+            source_path=name,
+            metadata={k: v for k, v in metadata.items() if v is not None},
+        )
+        documents_summary.append(
+            {
+                "doc_id": document.doc_id,
+                "title": document.title,
+                "updated_at": document.updated_at.isoformat(),
+                "metadata": document.metadata,
+            }
+        )
+
         for index, chunk in enumerate(chunks):
             chunk_id = f"{doc_id}-{index}"
             chunk_texts.append(chunk)
@@ -159,9 +185,19 @@ def ingest_documents(*, files: Iterable[Any]) -> Dict[str, Any]:
     store.upsert_embeddings(embeddings=embedding_vectors, metadata=metadata_payload)
 
     dimension = len(embedding_vectors[0]) if embedding_vectors else 0
+    document_payload = [
+        {
+            "doc_id": doc["doc_id"],
+            "title": doc["title"],
+            "updated_at": doc["updated_at"],
+            "metadata": doc.get("metadata", {}),
+        }
+        for doc in documents_summary
+    ]
     return {
-        "docs_created": len(documents_created),
+        "docs_created": len(documents_summary),
         "chunks": len(chunk_records),
         "backend": backend,
         "dim": dimension,
+        "documents": document_payload,
     }

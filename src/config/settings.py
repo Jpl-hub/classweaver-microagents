@@ -129,7 +129,7 @@ AGENT_SETTINGS: Dict[str, Any] = {
     "qwen_model": os.getenv("QWEN_MODEL", "Qwen/Qwen2.5-14B-Instruct"),
     "deepseek_model": os.getenv("DEEPSEEK_MODEL", "deepseek-ai/DeepSeek-V3"),
     "embedding_model": os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3"),
-    "request_timeout": float(os.getenv("REQUEST_TIMEOUT_SECONDS", "60")),
+    "request_timeout": float(os.getenv("REQUEST_TIMEOUT_SECONDS", "30")),
     "max_retries": int(os.getenv("OPENAI_MAX_RETRIES", "2")),
     "vector_backend": os.getenv("VECTOR_BACKEND", "faiss"),
     "vstore_path": os.getenv("VSTORE_PATH", "data/faiss.index"),

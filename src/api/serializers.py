@@ -3,6 +3,7 @@ from rest_framework import serializers
 
 class PrestudyTextSerializer(serializers.Serializer):
     text = serializers.CharField()
+    doc_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
 
     def validate_text(self, value: str) -> str:
         cleaned = value.strip()
@@ -19,6 +20,14 @@ class PrestudyResponseSerializer(serializers.Serializer):
     model_trace = serializers.JSONField()
     duration_ms = serializers.IntegerField()
     printable = serializers.JSONField(required=False)
+    lesson_plan = serializers.JSONField(required=False)
+
+
+class PrestudyJobStatusSerializer(serializers.Serializer):
+    id = serializers.CharField()
+    status = serializers.CharField()
+    detail = serializers.CharField(required=False, allow_blank=True)
+    estimated_wait_sec = serializers.IntegerField(required=False)
 
 
 class QuizStartRequestSerializer(serializers.Serializer):
@@ -53,3 +62,21 @@ class QuizSubmitRequestSerializer(serializers.Serializer):
 class KnowledgeSearchSerializer(serializers.Serializer):
     query = serializers.CharField()
     top_k = serializers.IntegerField(default=5, min_value=1, max_value=20)
+    doc_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
+
+
+class LessonEventSerializer(serializers.Serializer):
+    event_type = serializers.CharField(max_length=64)
+    actor = serializers.CharField(max_length=64, allow_blank=True, required=False)
+    payload = serializers.JSONField(required=False)
+
+
+class RecommendationTriggerSerializer(serializers.Serializer):
+    job_id = serializers.IntegerField()
+    session_id = serializers.CharField(required=False, allow_blank=True)
+
+
+class RecommendationTaskSerializer(serializers.Serializer):
+    id = serializers.CharField()
+    status = serializers.CharField()
+    output = serializers.JSONField(required=False)

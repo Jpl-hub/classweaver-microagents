@@ -35,12 +35,19 @@
         </div>
       </header>
 
+      <section v-if="sourceAction" class="rounded border border-dashed border-slate-200 bg-white/80 p-5 shadow-sm">
+        <p class="text-xs uppercase tracking-[0.3em] text-slate-500">来自行动卡</p>
+        <h2 class="mt-1 text-lg font-semibold text-slate-800">{{ sourceAction.title }}</h2>
+        <p class="mt-1 text-sm text-slate-600">{{ sourceAction.summary }}</p>
+        <p class="mt-2 text-xs text-slate-400">已由 Tutor 指派，完成本次小测即可回到首页查看结果。</p>
+      </section>
+
       <section class="space-y-4">
         <div class="flex items-center justify-between">
           <h2 class="text-lg font-semibold text-slate-800">题目列表</h2>
           <p class="text-sm text-slate-500">{{ unansweredCount }} 道题尚未作答</p>
         </div>
-        <div class="space-y-4">
+        <div class="space-y-4 max-h-[720px] overflow-y-auto pr-1">
           <QuizCard
             v-for="question in questions"
             :key="question.id"
@@ -132,7 +139,10 @@
           </table>
         </article>
 
-        <JsonPreview :value="result.diagnostics" />
+        <section v-if="result.diagnostics" class="rounded border border-slate-200 bg-white p-5 shadow-sm">
+          <h3 class="text-lg font-semibold text-slate-800">AI 诊断</h3>
+          <p class="mt-1 text-sm text-slate-600">{{ formatDiagnostics(result.diagnostics) }}</p>
+        </section>
       </section>
     </div>
   </section>
@@ -141,7 +151,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import JsonPreview from "../components/JsonPreview.vue";
 import QuizCard from "../components/QuizCard.vue";
 import { submitQuiz } from "../services/api";
 import type { QuizQuestion, QuizSubmitResponse } from "../types";
@@ -162,6 +171,7 @@ const sessionId = ref<string>("");
 const jobId = ref<string | undefined>(undefined);
 const questions = ref<QuizQuestion[]>([]);
 const answers = reactive<Record<string, string>>({});
+const sourceAction = ref<{ id?: string; title?: string; summary?: string } | null>(null);
 
 const isSubmitting = ref(false);
 const submitError = ref("");
@@ -232,8 +242,24 @@ function restoreFromStorage() {
   restoreHint.value = null;
 }
 
+function formatDiagnostics(value?: Record<string, unknown>): string {
+  if (!value || Object.keys(value).length === 0) {
+    return "暂无额外建议，继续保持。";
+  }
+  const summary = typeof value.summary === "string" ? value.summary : null;
+  if (summary) {
+    return summary;
+  }
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return "请根据测验结果调整复盘节奏。";
+  }
+}
+
 onMounted(() => {
   const statePayload = route.state as Record<string, unknown>;
+  sourceAction.value = (statePayload?.sourceAction as { id?: string; title?: string; summary?: string }) ?? null;
   const initial = {
     sessionId: statePayload?.sessionId as string | undefined,
     jobId: statePayload?.jobId as string | undefined,

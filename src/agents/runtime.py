@@ -23,6 +23,7 @@ def orchestrate_pipeline(
     planner_payload: Dict[str, Any] = {}
     final_payload: Dict[str, Any] = {}
     tutor_payload: Dict[str, Any] = {}
+    pipeline_status = "completed"
 
     try:
         start = time.perf_counter()
@@ -44,7 +45,15 @@ def orchestrate_pipeline(
         )
 
         start = time.perf_counter()
-        final_payload = rewriter_module.rewrite_quiz(client=client, planner_payload=planner_payload)
+        rewriter_error = None
+        final_payload = planner_payload.copy()
+        try:
+            rewritten_payload = rewriter_module.rewrite_quiz(client=client, planner_payload=planner_payload)
+            final_payload = rewritten_payload
+        except AgentInvocationError as exc:
+            rewriter_error = str(exc)
+            pipeline_status = "completed_with_fallback"
+            logger.warning("Rewriter failed, fallback to planner payload: %s", exc)
         rewriter_latency = int((time.perf_counter() - start) * 1000)
         trace.append(
             {
@@ -57,17 +66,30 @@ def orchestrate_pipeline(
                 "input_chars": len(str(planner_payload)),
                 "output_chars": len(str(final_payload)),
                 "rag": {"enabled": bool(rag_chunks), "backend": settings.get("vector_backend")},
-                "fallback": False,
+                "fallback": bool(rewriter_error),
+                "error": rewriter_error,
             }
         )
 
         start = time.perf_counter()
-        tutor_payload = tutor_module.build_tutor_response(
-            client=client,
-            final_quiz=final_payload,
-            answers={},
-            rag_chunks=rag_chunks,
-        )
+        tutor_error = None
+        tutor_payload = {}
+        try:
+            tutor_payload = tutor_module.build_tutor_response(
+                client=client,
+                final_quiz=final_payload,
+                answers={},
+                rag_chunks=rag_chunks,
+            )
+        except AgentInvocationError as exc:
+            tutor_error = str(exc)
+            pipeline_status = "completed_with_fallback"
+            logger.warning("Tutor failed, fallback to basic summary: %s", exc)
+            tutor_payload = {
+                "summary": "Tutor 模块暂时不可用，请稍后重试。",
+                "practice": [],
+                "followups": ["你可以继续在聊天框追问或重新生成。"],
+            }
         tutor_latency = int((time.perf_counter() - start) * 1000)
         trace.append(
             {
@@ -80,7 +102,8 @@ def orchestrate_pipeline(
                 "input_chars": len(str(final_payload)),
                 "output_chars": len(str(tutor_payload)),
                 "rag": {"enabled": bool(rag_chunks), "backend": settings.get("vector_backend")},
-                "fallback": False,
+                "fallback": bool(tutor_error),
+                "error": tutor_error,
             }
         )
     except AgentInvocationError as exc:
@@ -94,5 +117,5 @@ def orchestrate_pipeline(
         "planner_json": planner_payload,
         "final_json": combined_final,
         "model_trace": trace,
-        "status": "completed",
+        "status": pipeline_status,
     }

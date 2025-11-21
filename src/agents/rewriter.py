@@ -64,7 +64,7 @@ def rewrite_quiz(*, client, planner_payload: Dict[str, Any]) -> Dict[str, Any]:
     response = client.chat(
         model=settings.AGENT_SETTINGS["deepseek_model"],
         system=prompts.REWRITER_SYSTEM_PROMPT,
-        user=json.dumps(serialized, ensure_ascii=False),
+        user="请用简体中文改写以下题目与选项，保持 JSON 结构不变：\n" + json.dumps(serialized, ensure_ascii=False),
         temperature=0.4,
     )
 

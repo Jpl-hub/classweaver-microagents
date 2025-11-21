@@ -45,6 +45,13 @@ export interface PrintablePayload {
   practice: PrintablePracticeItem[];
 }
 
+export interface LessonPlanSummary {
+  id: number;
+  title: string;
+  structure: Record<string, unknown>;
+  notes?: string;
+}
+
 export interface PrestudyResponse {
   id: string;
   status: string;
@@ -53,6 +60,14 @@ export interface PrestudyResponse {
   model_trace: ModelTraceSegment[];
   duration_ms: number;
   printable?: PrintablePayload;
+  lesson_plan?: LessonPlanSummary;
+}
+
+export interface PrestudyJobTicket {
+  id: string;
+  status: string;
+  detail?: string;
+  estimated_wait_sec?: number;
 }
 
 export interface QuizStartResponse {
@@ -91,7 +106,62 @@ export interface KnowledgeSearchResponse {
   results: KnowledgeSearchResult[];
 }
 
+export interface KnowledgeDocumentSummary {
+  doc_id: string;
+  title: string;
+  updated_at: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface KnowledgeDocumentListResponse {
+  documents: KnowledgeDocumentSummary[];
+}
+
 export interface RagSearchRequest {
   query: string;
   top_k: number;
+  doc_ids?: string[];
+}
+
+export interface LessonEventEntry {
+  id: number;
+  event_type: string;
+  actor?: string;
+  payload?: Record<string, unknown>;
+  occurred_at: string;
+}
+
+export interface LessonTimelinePayload {
+  plan: LessonPlanSummary;
+  events: LessonEventEntry[];
+}
+
+export type RecommendationAgent = "planner" | "rewriter" | "tutor" | "coach";
+export type RecommendationStage = "focus" | "practice" | "classroom" | "resource" | "planning";
+export type RecommendationTarget = "review" | "quiz" | "timeline" | "resource";
+
+export interface RecommendationSuggestion {
+  id?: string;
+  agent?: RecommendationAgent;
+  stage?: RecommendationStage;
+  target?: RecommendationTarget;
+  type: string;
+  title: string;
+  summary: string;
+  action: string;
+  kp_ids?: string[];
+  doc_ids?: string[];
+}
+
+export interface RecommendationPayload {
+  generated_at: string;
+  job_id: string | number;
+  session_id?: string;
+  suggestions: RecommendationSuggestion[];
+}
+
+export interface RecommendationTaskResponse {
+  id: string;
+  status: string;
+  output: RecommendationPayload;
 }

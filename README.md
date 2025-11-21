@@ -1,70 +1,56 @@
-# ClassWeaver Micro-Agents
+# ClassWeaver Micro-Agents（中文版）
 
-端到端的课堂预习与练习agent，自动生成预习资料、测验题目与辅导反馈。
+ClassWeaver 是基于 Planner / Rewriter / Tutor / Timeline 的多智能体教学编排系统，提供课程生成、知识库检索、课堂测验、陪学教练、打印讲义等功能。本版本已全面中文化，支持自建知识库的增删改查，并强制生成中文内容。
 
-## 功能亮点
-- Django REST 后端串联 Planner、Rewriter、Tutor 三个agent。
-- Vue 3 + Vite 单页应用覆盖教师、学生与打印视图。
-- 兼容 SiliconFlow 平台的 OpenAI 客户端（Qwen / DeepSeek）及统一 trace。
-- 支持 RAG，默认使用 FAISS 向量库，可按需切换 pgvector。
+## 关键特性
+- **多智能体流水线**：Planner 拆解知识点与测验大纲，Rewriter 精炼题目，Tutor 生成练习与总结，支持实时状态轮询与模型调用轨迹。
+- **知识库 + RAG**：上传 PDF/DOCX/PPTX/TXT 等资料，自动切片向量化；任务可指定 `doc_ids`，知识搜索与生成均可绑定指定库。
+- **测验与教练**：随时发起测验（题目/会话持久化），陪学教练按场景导航知识点、练习与行动。
+- **讲义打印与行动清单**：打印知识点/术语/测验/练习；行动推荐支持记录状态、写入时间线和教学事件。
+- **中文输出与去重提醒**：所有 Agent 提示强制中文；“课程已生成”提示仅对同一任务播报一次并持久化去重。
+- **知识库管理**：前端支持删除单个知识库或一键清空（默认库不可删），后端提供 `/api/kb/documents/` `DELETE` 接口。
 
-## 前置条件
-- Python 3.11 与 pip（推荐 Windows PowerShell / macOS 终端操作）。
-- Node.js 18+ 与 npm。
-- SiliconFlow 账户获取 `BASE_URL=https://api.siliconflow.cn/v1` 与个人 `API_KEY`。
-- （可选）如启用 RAG，需准备待导入的 `.txt/.pdf/.docx/.pptx` 资料。
+## 目录结构
+- `src/agents/`：Planner/Rewrite/Tutor 逻辑与提示模板。
+- `src/api/`：DRF API 视图与序列化，知识库/课程/测验/推荐/时间线接口。
+- `src/services/`：流水线、打印、PPT 解析、推荐、评分等服务。
+- `webapp/src/views/`：Vue3 前端页面（Home/Knowledge/Coach/Take/Print/History）。
+- `webapp/src/services/api.ts`：前端 API 客户端（包含 locale/语言头、知识库删除接口）。
+- `docs/`：`用户手册.md`、`需求说明.md`、`详细设计.md`。
 
-## 快速上手步骤
-
-### 1. 初始化后端环境
+## 快速开始
+### 后端
 ```bash
 python -m venv .venv
-. .venv/Scripts/activate  # Windows
+. .venv/Scripts/activate   # Windows
 pip install -r requirements.txt
-cp .env.example .env
-```
-打开 `.env`，至少配置：
-- `BASE_URL=https://api.siliconflow.cn/v1`
-- `API_KEY=sk-...`（勿提交到仓库）
-- `EMBEDDING_MODEL`、`VECTOR_BACKEND` 如默认即可；若用 pgvector，按注释补充数据库连接。
-- `FRONTEND_ORIGIN=http://127.0.0.1:5173`（确保与前端访问端口一致，避免 CORS 拒绝）。
-
-### 2. 准备数据库并启动后端
-```bash
+cp .env.example .env       # 配置数据库/模型等
 python manage.py migrate
-python manage.py runserver
+python manage.py runserver 0.0.0.0:8000
 ```
-- `python manage.py migrate` 会同步最新迁移，重复执行是安全的，可确保数据表结构正确。
-- `python manage.py runserver` 会阻塞当前终端进行调试，若需继续操作请在新的终端窗口执行其它命令。
-- （可选）执行 `python manage.py createsuperuser` 创建管理员账号，方便登录 Django Admin。
-后端默认监听 `http://127.0.0.1:8000/`，所有 API 均已挂载在 `/api/`。
 
-### 3. 启动前端
+### 前端
 ```bash
 cd webapp
 npm install
-cp .env.example .env
-npm run dev
+cp .env.example .env       # 配置 API base 等
+npm run dev -- --host      # 开发
+npm run build              # 生产构建（dist 已使用最新代码）
 ```
-前端开发服务器默认在 `http://127.0.0.1:5173/`，页面会向后端 `http://127.0.0.1:8000/api/` 请求数据。
 
-### 4. （可选）构建 FAISS 知识库
-1. 确保后端正在运行，`.env` 中已配置 SiliconFlow 凭据。
-2. 在前端首页底部的“导入资料并检索知识库”模块，选择 `.txt/.pdf/.docx/.pptx` 文件，点击“上传到知识库”，界面会显示切片数量及提醒（若切片为 0，请先 OCR）。
-3. 需要脚本化导入时，可在仓库根目录建立 `corpus/` 并使用接口：
+### 知识库操作
+- 上传：在“知识库”页选择文件（支持 TXT/PDF/DOCX/PPTX），后台写入 `KnowledgeDocument/Chunk` 与向量库。
+- 绑定：在首页下拉选择要使用的知识库，生成任务会携带 `doc_ids`；知识搜索也会过滤到选定库。
+- 删除：在“知识库”页可删除单个知识库或“清空全部知识库”（默认库不可删），对应接口 `DELETE /api/kb/documents/<doc_id>/` 与 `DELETE /api/kb/documents/`。
+
+## 测试
+当前环境未安装后端依赖（`django`, `djangorestframework`, `openai` 等），`pytest -q` 会因缺依赖报错。安装 `requirements.txt` 后再运行：
 ```bash
-curl -X POST http://127.0.0.1:8000/api/kb/upload/ \
-  -F "file=@corpus/你的资料.pdf"
+pytest -q              # 后端测试
+cd webapp && npm run build   # 前端构建验证
 ```
-请求成功后，向量索引与元数据会写入 `data/faiss.index` 与 `data/chunks.jsonl`。
-
-上传完成后可在同一模块输入关键词检索，确认知识片段是否可用。生成预习资料时系统会自动调用这些上下文。
-
-### 5. 校验与构建
-- 后端单元测试：`pytest`
-- 前端构建：`cd webapp && npm run build`
-首次执行建议在依赖、凭据和（如开启）FAISS 数据准备完成后运行，以确认环境无误。
 
 ## 常见问题
-- **没有 SiliconFlow Key**：可先在 `.env` 中填占位值，仅使用本地数据与 RAG 会失败，但其余页面可加载。
-- **RAG 不需要**：跳过步骤 4 即可，代理将仅基于输入文本/PPT 生成内容。
+- **生成仍出现英文**：请先清空旧知识库/任务，确保前端已重建，后台加载了最新 Agent 提示；需要模型遵循 `locale=zh-CN` 和中文 prompt。
+- **重复“课程已生成”**：已在前端去重并持久化；如仍重复，清空浏览器 sessionStorage 再试。
+- **知识库异常或旧数据**：使用“清空全部知识库”后重新上传，再重新生成课程/测验。***

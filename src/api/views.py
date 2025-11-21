@@ -1,3 +1,4 @@
+import json
 import logging
 from pathlib import Path
 import uuid
@@ -10,24 +11,47 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from src.core.models import PrestudyJob, QuizAnswer, QuizSession
+from src.core.models import KnowledgeDocument, LessonEvent, LessonPlan, PrestudyJob, QuizAnswer, QuizSession
 from src.kb import ingest as kb_ingest
 from src.kb import retrieve as kb_retrieve
 from src.services import printable as printable_service
 from src.services import ppt as ppt_service
-from src.services.pipeline import run_pipeline
+from src.services.jobs import enqueue_prestudy_job
+from src.services import recommendation as recommendation_service
 from src.services.scoring import score_quiz
 
 from .serializers import (
     KnowledgeSearchSerializer,
+    LessonEventSerializer,
+    PrestudyJobStatusSerializer,
     PrestudyResponseSerializer,
     PrestudyTextSerializer,
     QuizAnswerSerializer,
     QuizStartRequestSerializer,
     QuizSubmitRequestSerializer,
+    RecommendationTaskSerializer,
+    RecommendationTriggerSerializer,
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_doc_ids(value: Any) -> list[str]:
+    if not value:
+        return []
+    if isinstance(value, (list, tuple)):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw:
+            return []
+        try:
+            data = json.loads(raw)
+            if isinstance(data, list):
+                return [str(item).strip() for item in data if str(item).strip()]
+        except json.JSONDecodeError:
+            return [raw]
+    return []
 
 
 class PrestudyFromTextView(APIView):
@@ -37,18 +61,15 @@ class PrestudyFromTextView(APIView):
         serializer = PrestudyTextSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         text = serializer.validated_data["text"]
+        doc_ids = [doc_id for doc_id in serializer.validated_data.get("doc_ids", []) if doc_id.strip()]
 
-        job = PrestudyJob.objects.create(source_type="text", source_excerpt=text[:512], status="processing")
-        try:
-            payload = run_pipeline(job=job, text=text)
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("Prestudy pipeline failed for job %s", job.pk)
-            job.status = "failed"
-            job.save(update_fields=["status"])
-            return Response({"detail": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        job = PrestudyJob.objects.create(source_type="text", source_excerpt=text[:512], status="queued")
+        enqueue_prestudy_job(job=job, text=text, doc_ids=doc_ids)
 
-        response_serializer = PrestudyResponseSerializer(payload)
-        return Response(response_serializer.data)
+        response_serializer = PrestudyJobStatusSerializer(
+            {"id": str(job.pk), "status": job.status, "detail": "任务已提交，正在排队", "estimated_wait_sec": 20}
+        )
+        return Response(response_serializer.data, status=status.HTTP_202_ACCEPTED)
 
 
 class PrestudyFromPptView(APIView):
@@ -64,17 +85,17 @@ class PrestudyFromPptView(APIView):
         if upload.content_type and upload.content_type not in ppt_service.ALLOWED_MIME_TYPES:
             return Response({"detail": f"Unsupported content type: {upload.content_type}"}, status=status.HTTP_400_BAD_REQUEST)
 
-        job = PrestudyJob.objects.create(source_type="ppt", source_excerpt="", status="processing")
-        try:
-            payload = run_pipeline(job=job, ppt_file=upload)
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("Prestudy pipeline failed for job %s", job.pk)
-            job.status = "failed"
-            job.save(update_fields=["status"])
-            return Response({"detail": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        file_bytes = upload.read()
+        doc_ids_raw = request.data.get("doc_ids")
+        doc_ids = _parse_doc_ids(doc_ids_raw)
 
-        response_serializer = PrestudyResponseSerializer(payload)
-        return Response(response_serializer.data)
+        job = PrestudyJob.objects.create(source_type="ppt", source_excerpt="", status="queued")
+        enqueue_prestudy_job(job=job, ppt_bytes=file_bytes, filename=upload.name, doc_ids=doc_ids)
+
+        response_serializer = PrestudyJobStatusSerializer(
+            {"id": str(job.pk), "status": job.status, "detail": "PPT 解析中，稍后可查看结果", "estimated_wait_sec": 40}
+        )
+        return Response(response_serializer.data, status=status.HTTP_202_ACCEPTED)
 
 
 class PrestudyDetailView(APIView):
@@ -90,7 +111,36 @@ class PrestudyDetailView(APIView):
         }
         printable_payload = printable_service.build_printable_payload(base_payload["final_json"])
         base_payload["printable"] = printable_payload
+        plan = getattr(job, "lesson_plan", None)
+        if plan:
+            base_payload["lesson_plan"] = {
+                "id": plan.pk,
+                "title": plan.title,
+                "structure": plan.structure,
+                "notes": plan.notes,
+            }
         serializer = PrestudyResponseSerializer(base_payload)
+        return Response(serializer.data)
+
+
+class PrestudyJobStatusView(APIView):
+    def get(self, request, pk: int, *args, **kwargs):
+        job = get_object_or_404(PrestudyJob, pk=pk)
+        detail = ""
+        if job.status == "queued":
+            detail = "排队中，请稍后刷新"
+        elif job.status == "processing":
+            detail = "正在调用模型 ..."
+        elif job.status == "failed":
+            detail = "任务失败，请查看日志或重试"
+        serializer = PrestudyJobStatusSerializer(
+            {
+                "id": str(job.pk),
+                "status": job.status,
+                "detail": detail,
+                "estimated_wait_sec": 10 if job.status in {"queued", "processing"} else 0,
+            }
+        )
         return Response(serializer.data)
 
 
@@ -198,10 +248,103 @@ class KnowledgeSearchView(APIView):
         serializer.is_valid(raise_exception=True)
         query = serializer.validated_data["query"]
         top_k = serializer.validated_data["top_k"]
+        doc_ids = serializer.validated_data.get("doc_ids") or []
         try:
-            results = kb_retrieve.retrieve_context(query=query, top_k=top_k)
+            results = kb_retrieve.retrieve_context(query=query, top_k=top_k, doc_ids=doc_ids)
         except Exception as exc:  # noqa: BLE001
             logger.exception("Knowledge search failed")
             return Response({"detail": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         return Response({"results": results})
+
+
+class KnowledgeDocumentListView(APIView):
+    def get(self, request, *args, **kwargs):
+        documents = (
+            KnowledgeDocument.objects.order_by("-updated_at")
+            .values("doc_id", "title", "updated_at", "metadata")[:200]
+        )
+        payload = [
+            {
+                "doc_id": doc["doc_id"],
+                "title": doc["title"],
+                "updated_at": doc["updated_at"].isoformat() if doc["updated_at"] else "",
+                "metadata": doc.get("metadata") or {},
+            }
+            for doc in documents
+        ]
+        return Response({"documents": payload})
+
+    def delete(self, request, *args, **kwargs):
+        """Delete all knowledge documents and their chunks."""
+        deleted_count, _ = KnowledgeDocument.objects.all().delete()
+        return Response({"deleted": deleted_count}, status=status.HTTP_200_OK)
+
+
+class KnowledgeDocumentDetailView(APIView):
+    def delete(self, request, doc_id: str, *args, **kwargs):
+        doc = KnowledgeDocument.objects.filter(doc_id=doc_id).first()
+        if not doc:
+            return Response({"detail": "Document not found."}, status=status.HTTP_404_NOT_FOUND)
+        doc.delete()
+        return Response({"deleted": 1}, status=status.HTTP_200_OK)
+
+
+class LessonTimelineView(APIView):
+    def get(self, request, pk: int, *args, **kwargs):
+        plan = get_object_or_404(LessonPlan, pk=pk)
+        events = plan.events.all()[:100]
+        payload = {
+            "plan": {
+                "id": plan.pk,
+                "title": plan.title,
+                "structure": plan.structure,
+                "notes": plan.notes,
+            },
+            "events": [
+                {
+                    "id": event.pk,
+                    "event_type": event.event_type,
+                    "actor": event.actor,
+                    "payload": event.payload,
+                    "occurred_at": event.occurred_at.isoformat(),
+                }
+                for event in events
+            ],
+        }
+        return Response(payload)
+
+
+class LessonEventCreateView(APIView):
+    parser_classes = [JSONParser]
+
+    def post(self, request, pk: int, *args, **kwargs):
+        plan = get_object_or_404(LessonPlan, pk=pk)
+        serializer = LessonEventSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        LessonEvent.objects.create(
+            plan=plan,
+            event_type=data["event_type"],
+            actor=data.get("actor", ""),
+            payload=data.get("payload") or {},
+        )
+        return Response(status=status.HTTP_201_CREATED)
+
+
+class RecommendationTriggerView(APIView):
+    parser_classes = [JSONParser]
+
+    def post(self, request, *args, **kwargs):
+        serializer = RecommendationTriggerSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        job = get_object_or_404(PrestudyJob, pk=serializer.validated_data["job_id"])
+        session_id = serializer.validated_data.get("session_id")
+        session = None
+        if session_id:
+            session = get_object_or_404(QuizSession, session_id=session_id)
+        task = recommendation_service.run_recommendation_task(job=job, session=session)
+        response = RecommendationTaskSerializer(
+            {"id": str(task.pk), "status": task.status, "output": task.output or {}}
+        )
+        return Response(response.data, status=status.HTTP_201_CREATED)
