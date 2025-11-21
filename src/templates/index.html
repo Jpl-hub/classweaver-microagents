@@ -1,4 +1,4 @@
-{% load static %}
+{% load static vite %}
 <!doctype html>
 <html lang="en">
   <head>
@@ -6,10 +6,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ClassWeaver Micro-Agents</title>
     <link rel="stylesheet" href="{% static 'print.css' %}" />
+    {% vite_css "src/main.ts" as vite_css_files %}
+    {% for css_file in vite_css_files %}
+    <link rel="stylesheet" href="{{ css_file }}" crossorigin />
+    {% endfor %}
   </head>
   <body>
     <div id="app">Loading ClassWeaver...</div>
     <noscript>This application requires JavaScript to run. Please enable it in your browser.</noscript>
+    {% vite_asset "src/main.ts" as main_bundle %}
+    {% if main_bundle %}
+    <script type="module" crossorigin src="{{ main_bundle }}"></script>
+    {% else %}
     <script type="module" src="/assets/main.js"></script>
+    {% endif %}
   </body>
 </html>

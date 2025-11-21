@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
@@ -10,6 +11,8 @@ try:
     import faiss  # type: ignore
 except ImportError:  # pragma: no cover - handled via runtime checks
     faiss = None
+
+logger = logging.getLogger(__name__)
 
 
 class VectorStoreError(RuntimeError):
@@ -43,7 +46,13 @@ class FaissStore:
             self.index = faiss.IndexFlatIP(dimension)
             self.dimension = dimension
         elif self.dimension != dimension:
-            raise VectorStoreError(f"Embedding dimension mismatch: expected {self.dimension}, got {dimension}")
+            logger.warning(
+                "Embedding dimension mismatch detected for %s (expected %s, received %s). Resetting FAISS index.",
+                self.index_path,
+                self.dimension,
+                dimension,
+            )
+            self._reset_index(dimension)
 
     def upsert(self, embeddings: List[List[float]], metadata: List[Dict[str, Any]]) -> None:
         if not embeddings:
@@ -56,6 +65,17 @@ class FaissStore:
         faiss.normalize_L2(array)
         self.index.add(array)
         self.metadata.extend(metadata)
+        self._save()
+
+    def _reset_index(self, dimension: int) -> None:
+        """Drop existing FAISS data on dimension mismatch."""
+        self.index = faiss.IndexFlatIP(dimension)
+        self.dimension = dimension
+        self.metadata = []
+        if self.index_path.exists():
+            self.index_path.unlink()
+        if self.meta_path.exists():
+            self.meta_path.unlink()
         self._save()
 
     def search(self, embedding: List[float], top_k: int) -> List[Tuple[float, Dict[str, Any]]]:
@@ -112,3 +132,8 @@ def get_store(backend: str) -> Any:
 def upsert_embeddings(*, embeddings: List[List[float]], metadata: List[Dict[str, Any]]) -> None:
     store = get_store(settings.AGENT_SETTINGS["vector_backend"])
     store.upsert(embeddings, metadata)
+
+
+def clear_store_cache() -> None:
+    """Clear cached vector-store instances (used by management commands/tests)."""
+    _STORE_CACHE.clear()

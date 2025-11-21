@@ -2,7 +2,7 @@ import json
 from typing import Any, Dict, List, Optional
 
 from django.conf import settings
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from . import prompts
 from .utils import parse_agent_json
@@ -13,6 +13,26 @@ class TutorPracticeItem(BaseModel):
     answer: str
     reasoning: str = ""
     citations: List[Dict[str, Any]] = Field(default_factory=list)
+
+    @field_validator("citations", mode="before")
+    @classmethod
+    def normalize_citations(cls, value: Any) -> List[Dict[str, Any]]:
+        """Accept strings or dicts from the agent and normalize into dict lists."""
+        if not value:
+            return []
+        if isinstance(value, dict):
+            value = [value]
+        elif isinstance(value, str):
+            value = [{"text": value}]
+        normalized: List[Dict[str, Any]] = []
+        for entry in value:
+            if isinstance(entry, dict):
+                normalized.append(entry)
+            elif isinstance(entry, str):
+                normalized.append({"text": entry})
+            else:
+                continue
+        return normalized
 
 
 class TutorSummary(BaseModel):
@@ -45,7 +65,7 @@ def build_tutor_response(
     response = client.chat(
         model=settings.AGENT_SETTINGS["qwen_model"],
         system=prompts.TUTOR_SYSTEM_PROMPT,
-        user=json.dumps(payload, ensure_ascii=False),
+        user="请用简体中文生成复盘与练习，保持 JSON 结构不变：\n" + json.dumps(payload, ensure_ascii=False),
         temperature=0.3,
     )
 

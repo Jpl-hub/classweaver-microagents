@@ -25,6 +25,19 @@ class PlannerQuizItem(BaseModel):
     kp_ids: List[str] = Field(default_factory=list)
     refs: List[Dict[str, Any]] = Field(default_factory=list)
 
+    @field_validator("options", mode="before")
+    @classmethod
+    def ensure_all_options(cls, value: Any) -> Dict[str, str]:
+        if not isinstance(value, dict):
+            raise ValueError("Options must be a dictionary.")
+        normalized: Dict[str, str] = {}
+        for letter in ("A", "B", "C", "D"):
+            option_text = value.get(letter)
+            if option_text is None or str(option_text).strip() == "":
+                option_text = f"{letter} 选项待补全"
+            normalized[letter] = str(option_text)
+        return normalized
+
     @field_validator("refs", mode="before")
     @classmethod
     def normalize_refs(cls, value: Any) -> List[Dict[str, Any]]:
@@ -63,7 +76,11 @@ class PlannerResponse(BaseModel):
 
 
 def _build_user_prompt(text: str, rag_chunks: List[Dict[str, Any]]) -> str:
-    buffer = [text.strip()]
+    buffer = [
+        "请用简体中文输出所有内容，不要出现英文讲解。",
+        "根据以下输入生成课程概览、知识点、术语表和测验题：",
+        text.strip(),
+    ]
     if rag_chunks:
         buffer.append("CONTEXT:")
         for chunk in rag_chunks:
@@ -83,6 +100,7 @@ def generate_plan(*, client, text: str, rag_chunks: List[Dict[str, Any]]) -> Dic
         temperature=0.3,
     )
     parsed = parse_agent_json(response)
+    _sanitize_quiz_options(parsed)
     try:
         validated = PlannerResponse.model_validate(parsed)
     except ValidationError as exc:
@@ -91,3 +109,28 @@ def generate_plan(*, client, text: str, rag_chunks: List[Dict[str, Any]]) -> Dic
     if rag_chunks:
         payload.setdefault("rag", {})["refs"] = rag_chunks
     return payload
+
+
+def _sanitize_quiz_options(payload: Dict[str, Any]) -> None:
+    quiz = payload.get("quiz")
+    if not isinstance(quiz, dict):
+        return
+    items = quiz.get("items")
+    if not isinstance(items, list):
+        return
+    normalized_items: List[Dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        options = item.get("options")
+        if not isinstance(options, dict):
+            continue
+        sanitized = {}
+        for letter in ("A", "B", "C", "D"):
+            text_value = options.get(letter)
+            if text_value is None or str(text_value).strip() == "":
+                text_value = f"{letter} 选项待补全"
+            sanitized[letter] = str(text_value)
+        item["options"] = sanitized
+        normalized_items.append(item)
+    quiz["items"] = normalized_items

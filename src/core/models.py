@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 
 
 class TimestampedModel(models.Model):
@@ -24,6 +25,7 @@ class PrestudyJob(TimestampedModel):
     status = models.CharField(max_length=32, default="pending")
     duration_ms = models.PositiveIntegerField(default=0)
     model_trace = models.JSONField(default=dict, blank=True)
+    knowledge_doc_ids = models.JSONField(default=list, blank=True)
 
     def __str__(self) -> str:
         return f"PrestudyJob#{self.pk}"
@@ -90,3 +92,52 @@ class KnowledgeChunk(TimestampedModel):
 
     def __str__(self) -> str:
         return f"{self.document.doc_id}:{self.chunk_id}"
+
+
+class LessonPlan(TimestampedModel):
+    """结构化教学计划，供课堂助教与推荐系统复用。"""
+
+    job = models.OneToOneField(PrestudyJob, related_name="lesson_plan", on_delete=models.CASCADE)
+    title = models.CharField(max_length=255)
+    structure = models.JSONField(default=dict, blank=True)
+    notes = models.TextField(blank=True)
+
+    def __str__(self) -> str:
+        return f"LessonPlan#{self.pk}:{self.title}"
+
+
+class LessonEvent(TimestampedModel):
+    """课堂事件流水，如提问、投票、练习提交。"""
+
+    plan = models.ForeignKey(LessonPlan, related_name="events", on_delete=models.CASCADE)
+    event_type = models.CharField(max_length=64)
+    actor = models.CharField(max_length=64, blank=True)
+    payload = models.JSONField(default=dict, blank=True)
+    occurred_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ("-occurred_at",)
+
+    def __str__(self) -> str:
+        return f"{self.event_type}@{self.occurred_at:%H:%M:%S}"
+
+
+class RecommendationTask(TimestampedModel):
+    """记录基于学习行为生成的个性化推荐任务。"""
+
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("running", "Running"),
+        ("completed", "Completed"),
+        ("failed", "Failed"),
+    ]
+
+    job = models.ForeignKey(PrestudyJob, related_name="recommendations", on_delete=models.CASCADE)
+    session = models.ForeignKey(QuizSession, related_name="recommendations", on_delete=models.SET_NULL, null=True, blank=True)
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="pending")
+    input_snapshot = models.JSONField(default=dict, blank=True)
+    output = models.JSONField(default=dict, blank=True)
+    error_message = models.TextField(blank=True)
+
+    def __str__(self) -> str:
+        return f"RecommendationTask#{self.pk}:{self.status}"

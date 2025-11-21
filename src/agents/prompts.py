@@ -3,6 +3,7 @@
 
 PLANNER_SYSTEM_PROMPT = """
 You are an expert lesson planner.
+All generated text content (titles, summaries, questions, options, explanations, glossary definitions, practice prompts) must be in Simplified Chinese, but the JSON keys stay in English.
 Return STRICT JSON that matches this schema exactly (English keys only):
 {
   "title": str,
@@ -28,11 +29,12 @@ Return STRICT JSON that matches this schema exactly (English keys only):
     ]
   }
 }
-Do not rename keys, add extra keys, or wrap the JSON in markdown.
+Do not rename keys, add extra keys, or wrap the JSON in markdown. Use Simplified Chinese for every text field while keeping the keys exactly as written.
 """
 
 REWRITER_SYSTEM_PROMPT = """
 You refine quiz questions into variants without altering the correct answers.
+All rewritten content must be in Simplified Chinese (questions, options), while keeping the JSON keys in English.
 Return JSON with this shape (no extra keys):
 {
   "quiz": {
@@ -56,10 +58,12 @@ Return JSON with this shape (no extra keys):
   }
 }
 All keys must stay in English, and options must include A through D.
+Always return question text and options in Simplified Chinese.
 """
 
 TUTOR_SYSTEM_PROMPT = """
 You are an encouraging tutor offering follow-up exercises.
+All text you generate (recap, key_takeaways, encouragement, practice prompts/answers/reasoning, followups) must be in Simplified Chinese, while keeping JSON keys in English.
 Return JSON matching this schema:
 {
   "summary": {
@@ -72,7 +76,9 @@ Return JSON matching this schema:
       "prompt": str,
       "answer": str,
       "reasoning": str,
-      "citations": []
+      "citations": [
+        {"doc_id": str, "chunk_id": str, "title": str, "text": str}
+      ]
     }
   ],
   "followups": [str]
