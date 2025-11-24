@@ -1,65 +1,56 @@
-# ClassWeaver Micro-Agents
+# ClassWeaver Micro-Agents（V3）
 
-ClassWeaver 是一个基于 Planner / Rewriter / Tutor / Timeline 的学习助手系统，支持课程生成、知识库问答、练习测验、推荐与打印等功能。V3 分支默认使用 MySQL，并补充了登录 / 注册能力。
+面向中文课堂的 AI 备课与陪练工具。上传你的资料，系统自动规划课程、生成测验与行动建议，时间线可拖拽，讲义一键打印。
 
-## 关键特性
-- **多智能体流程**：Planner 规划内容，Rewriter 优化表述，Tutor 负责练习与总结。
-- **知识库 + RAG**：按“知识库/文件夹”分组上传 PDF/DOCX/PPTX/TXT，检索严格限定在当前用户的当前知识库。
-- **学习记录与时间线**：课程、测验、事件写入时间线，可拖拽调整顺序；打印讲义一键生成。
-- **账户隔离**：所有业务接口需登录，会话基于 Cookie + CSRF；前端缓存登录态，接口 401 会清空缓存并要求重新登录。
-- **前后端联动**：Django REST API + Vue3 前端（含登录/注册/知识库/时间线/打印视图）。
+## 产品亮点
+- 多智能体流水线：Planner/Rewrite/Tutor 协同生成知识点、测验、练习与总结。
+- 知识库严格隔离：按知识库上传 PDF/DOCX/PPTX/TXT，检索只命中当前用户的当前库，向量召回后二次过滤避免错库。
+- 课堂时间线与行动：事件、测验、推荐动作写入时间线，可拖拽排序；打印视图随时导出。
+- 登录与会话：Session+CSRF，前端缓存登录态；接口 401 自动清理缓存并要求重新登录。
+- 全中文体验：界面与生成结果默认简体中文。
 
-## 目录结构
-- `src/agents/`：Planner/Rewrite/Tutor 示例逻辑。
-- `src/api/`：Django REST API（知识库、课程、推荐等）。
-- `src/services/`：打印、PPT、推荐、评分等服务。
-- `webapp/src/views/`：Vue3 前端页面（Home/Knowledge/Coach/Take/Print/History/Login/Register）。
-- `webapp/src/services/api.ts`：前端 API 客户端（含 locale、知识库、鉴权等）。
-- `docs/`：说明文档。
+## 体验路径
+1) 登录/注册后，先在“知识库”创建并上传资料。
+2) 回到首页选择知识库，输入意图或上传 PPT，生成课程/测验/练习。
+3) 在课程总览查看知识点、测验预览、行动指南与时间线；可发起测验、拖拽事件、打印讲义。
+4) “课堂教练”按场景导航，“历史”可查看最近任务，本地缓存随时清除。
 
-## 赶快开始
-> 默认使用 MySQL 8+，请先准备数据库并配置好环境变量；FAISS 索引与切片文件已在 .gitignore 中。
+## 快速启动
+> 默认使用 MySQL 8+ 与本地 FAISS，索引文件已被 .gitignore 排除。
 
-### 后端
-1. 创建 MySQL 数据库（默认名 `classweaver`），在 `.env` 设置 `MYSQL_DATABASE/MYSQL_USER/MYSQL_PASSWORD/MYSQL_HOST/MYSQL_PORT`，或直接使用 `DATABASE_URL=mysql://user:pass@host:3306/dbname`。
-2. 安装并启动：
+**后端**
 ```bash
 python -m venv .venv
-. .venv/Scripts/activate   # Windows
-pip install -r requirements.txt    # 包含 mysqlclient
-cp .env.example .env
-python manage.py makemigrations core   # 表最小化：未启用 Django admin
+. .venv/Scripts/activate        # Windows
+pip install -r requirements.txt # 包含 mysqlclient
+cp .env.example .env            # 配置 MySQL / API_KEY / 模型
+python manage.py makemigrations core
 python manage.py migrate
 python manage.py runserver 0.0.0.0:8000
 ```
 
-### 前端
+**前端**
 ```bash
 cd webapp
 npm install
-cp .env.example .env       # 设置 API base
+cp .env.example .env   # 设置 VITE_API_BASE
 npm run dev -- --host
-npm run build              # 生成 dist 用于部署
+npm run build          # 部署时使用
 ```
 
-### 知识库
-- 知识库/文件夹：先创建知识库，再向该库上传多个文件；同一用户的库彼此独立。
-- API：`GET/POST /api/kb/bases/` 列表/创建库；`DELETE /api/kb/bases/<base_id>/` 删除库（级联文件）。
-- 上传：`POST /api/kb/upload/` 携带 `base_id`（若不传自动使用“默认知识库”），上传 TXT/PDF/DOCX/PPTX；后台写入 `KnowledgeBase -> KnowledgeDocument -> KnowledgeChunk`。
-- 检索：`POST /api/kb/search/` 必须带 `base_id`，仅在当前用户该库内检索；向量召回后再按库/文档过滤，避免错库。
-- 删除：`DELETE /api/kb/documents/` 清空当前用户所有文件；`DELETE /api/kb/documents/<doc_id>?base_id=<id>` 删除指定库的单个文件。
+## 开发要点
+- 会话：前端缓存用户信息；任意接口 401 会清空缓存并由路由守卫跳转登录。
+- 知识库：上传需带 base_id，检索/问答只在当前库；FAISS 索引文件默认写入 `data/`，不会进入仓库。
+- 时间线：单列滚动区，卡片拖拽时整块移动，便于重排事件。
 
-### 登录 / 注册
-- API：`POST /api/auth/register/`、`POST /api/auth/login/`、`POST /api/auth/logout/`、`GET /api/auth/me/`
-- 前端：`/login`、`/register`；登录后会话 Cookie 自动携带。若接口返回 401，会自动清理前端缓存并跳转登录。
-
-### 前端小提示
-- 打印、时间线、知识库等路由都依赖登录态；刷新不会丢失缓存，会话失效时会在下次接口调用时要求重新登录。
-- 时间线支持拖拽排序，卡片整块跟随移动；滚动区已放大到便于查看。
+## 文档
+- `docs/需求分析.md`：角色、场景与需求
+- `docs/详细设计.md`：模块划分、数据模型与流程
+- `docs/用户手册.md`：操作步骤与注意事项
 
 ## 测试
-后端：`pytest -q`（测试已自动使用内存 SQLite，默认无需 MySQL；若想连真实库，可先导出 `DATABASE_URL`）。前端：`npm run build`。
+后端：`pytest -q`（默认使用内存 SQLite；如需真实库请设置 `DATABASE_URL`）。  
+前端：`npm run build` 验证构建。
 
-## 其他提示
-- 保持 `Accept-Language=zh-CN` 以获得中文输出。
-- 前端 fetch 默认 `credentials: include`，跨域时需注意 CORS 与同源策略。
+## 状态
+当前为 V3，默认 MySQL + FAISS。本仓库不包含模型与索引文件，请按需配置 API_KEY 与模型名称。***
