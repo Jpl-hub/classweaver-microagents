@@ -241,18 +241,18 @@
       </article>
     </section>
 
-    <section v-if="job" class="grid gap-6 xl:grid-cols-2">
+    <section v-if="job" class="grid gap-6 xl:grid-cols-[1.4fr_0.6fr]">
       <article class="glass-panel space-y-5">
         <header class="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p class="text-xs uppercase tracking-[0.4em] text-slate-500">行动指南</p>
+            <p class="text-xs uppercase tracking-[0.4em] text-slate-500">学习指导</p>
             <h2 class="text-xl font-semibold text-slate-900">下一步怎么做？</h2>
           </div>
           <button class="btn-secondary text-xs" type="button" :disabled="isLoadingRecommendations" @click="loadRecommendations()">
             {{ isLoadingRecommendations ? '刷新中...' : '刷新推荐' }}
           </button>
         </header>
-        <p class="text-sm text-slate-500">先教学，再测验，最后把真实行动写回教学方案。</p>
+          <p class="text-sm text-slate-500">按推荐路线学习与测验，若有疑惑可随时补充需求并调整顺序。</p>
         <div class="flex flex-col gap-4 lg:flex-row">
           <article class="flex-1 rounded-3xl border border-white/80 bg-white/85 p-4 shadow-sm space-y-3 flex flex-col">
             <header class="flex items-center justify-between text-sm font-semibold text-slate-800">
@@ -303,10 +303,10 @@
         </div>
         <article class="rounded-3xl border border-white/80 bg-white/85 p-4 shadow-sm space-y-3">
           <header class="flex items-center justify-between text-sm font-semibold text-slate-800">
-            <span>添加行动</span>
-            <span class="text-xs text-slate-500">{{ topRecommendations.length ? `${topRecommendations.length} 条推荐` : '等待 AI 建议' }}</span>
+            <span>补充学习步骤</span>
+            <span class="text-xs text-slate-500">{{ topRecommendations.length ? `${topRecommendations.length} 条建议` : '等待 AI 建议' }}</span>
           </header>
-          <p class="text-sm text-slate-600">结合 AI 给出的提醒，把课堂任务写回教学方案或直接触发陪学助教。</p>
+          <p class="text-sm text-slate-600">结合 AI 给出的学习步骤，确认接下来怎么学、怎么讲，有补充就写下来。</p>
           <div v-if="topRecommendations.length" class="space-y-2 text-xs text-slate-600 max-h-[360px] overflow-y-auto pr-1">
             <article
               v-for="action in topRecommendations"
@@ -317,55 +317,69 @@
               <p>{{ action.summary }}</p>
             </article>
           </div>
-          <p v-else class="text-xs text-slate-400">暂无推荐，点击上方“刷新推荐”即可获取新的行动。</p>
+          <p v-else class="text-xs text-slate-400">暂无建议，点击上方“刷新推荐”获取新的学习步骤。</p>
           <div class="flex flex-wrap gap-2">
-            <button class="btn-secondary text-xs" type="button" @click="openEventModal()">记录教学反馈</button>
+            <button class="btn-secondary text-xs" type="button" @click="openEventModal()">补充学习需求</button>
             <button class="btn-ghost text-xs" type="button" @click="openCoachMode()">进入陪学助教</button>
           </div>
         </article>
       </article>
-      <article class="glass-panel space-y-4 flex flex-col">
-        <header class="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <p class="text-xs uppercase tracking-[0.4em] text-slate-500">教学方案</p>
-            <h2 class="text-xl font-semibold text-slate-900">教学方案时间线</h2>
-          </div>
-          <div class="flex flex-wrap gap-2">
-            <button class="btn-secondary text-xs" type="button" @click="openCoachMode()">进入陪学助教</button>
-            <button class="btn-ghost text-xs" type="button" @click="openEventModal()">记录教学事件</button>
-          </div>
-        </header>
-        <div v-if="timelineLoading" class="text-sm text-slate-500 flex-1 min-h-[520px]">时间线加载中...</div>
-        <div
-          v-else
-          class="grid gap-3 md:grid-cols-1 flex-1 min-h-[520px] max-h-[720px] overflow-y-auto pr-1"
-        >
-          <div
-            v-for="(event, index) in timelineEvents"
-            :key="event.id"
-            class="relative cursor-move rounded-2xl p-4 text-sm shadow transition-transform duration-150"
-            :class="{ 'ring-2 ring-white/80 scale-[1.01]': draggingEventIndex === index }"
-            :style="eventCardStyle(index)"
-            draggable="true"
-            @dragstart="onEventDragStart(index)"
-            @dragover.prevent
-            @drop="onEventDrop(index)"
-            @dragend="onEventDragEnd"
-          >
-            <div class="flex items-center justify-between text-[11px] uppercase tracking-[0.25em] text-slate-50/90">
-              <span>{{ formatEventType(event.event_type) }}</span>
-              <span>{{ formatEventTime(event.occurred_at) }}</span>
+      <div class="flex flex-col gap-6">
+        <article class="glass-panel space-y-4 flex flex-col">
+          <header class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p class="text-xs uppercase tracking-[0.4em] text-slate-500">学习计划</p>
+              <h2 class="text-xl font-semibold text-slate-900">学习计划时间线</h2>
             </div>
-            <p class="mt-2 text-lg font-semibold text-white drop-shadow">
-              {{ event.payload?.title || event.payload?.note || '课堂记录' }}
-            </p>
-            <p class="mt-1 text-xs text-slate-50/90">
-              {{ event.payload?.summary || '系统自动记录' }}
-            </p>
+            <div class="flex flex-wrap gap-2">
+              <button class="btn-secondary text-xs" type="button" @click="openCoachMode()">进入陪学助教</button>
+              <button class="btn-ghost text-xs" type="button" @click="openEventModal()">调整学习步骤</button>
+            </div>
+          </header>
+          <div v-if="timelineLoading" class="text-sm text-slate-500 flex-1 min-h-[520px]">时间线加载中...</div>
+          <div
+            v-else
+            class="grid gap-3 md:grid-cols-1 flex-1 min-h-[520px] max-h-[720px] overflow-y-auto pr-1"
+          >
+            <div
+              v-for="(event, index) in timelineEvents"
+              :key="event.id"
+              class="relative cursor-move rounded-2xl p-4 text-sm shadow transition-transform duration-150"
+              :class="{ 'ring-2 ring-white/80 scale-[1.01]': draggingEventIndex === index }"
+              :style="eventCardStyle(index)"
+              draggable="true"
+              @dragstart="onEventDragStart(index)"
+              @dragover.prevent
+              @drop="onEventDrop(index)"
+              @dragend="onEventDragEnd"
+            >
+              <div class="flex items-center justify-between text-[11px] uppercase tracking-[0.25em] text-slate-50/90">
+                <span>{{ formatEventType(event.event_type) }}</span>
+                <span>{{ formatEventTime(event.occurred_at) }}</span>
+              </div>
+              <p class="mt-2 text-lg font-semibold text-white drop-shadow">
+                {{ event.payload?.title || event.payload?.note || '学习记录' }}
+              </p>
+              <p class="mt-1 text-xs text-slate-50/90">
+                {{ event.payload?.summary || '系统自动记录' }}
+              </p>
+            </div>
+            <div v-if="!timelineEvents.length" class="col-span-2 text-xs text-slate-500">暂无事件，执行行动后会自动补齐。</div>
           </div>
-          <div v-if="!timelineEvents.length" class="col-span-2 text-xs text-slate-500">暂无事件，执行行动后会自动补齐。</div>
-        </div>
-      </article>
+        </article>
+        <article class="glass-panel flex flex-col gap-4">
+          <header class="flex items-center justify-between">
+            <div>
+              <p class="text-xs uppercase tracking-[0.35em] text-slate-500">今日鼓励</p>
+              <h2 class="text-xl font-semibold text-slate-900">给自己的小加油</h2>
+            </div>
+          </header>
+          <div class="rounded-3xl border border-emerald-200/80 bg-emerald-50/80 px-5 py-6 text-center shadow-sm">
+            <p class="text-base font-semibold text-emerald-900">{{ encouragement.message }}</p>
+            <p class="mt-2 text-sm text-emerald-700">{{ encouragement.sub }}</p>
+          </div>
+        </article>
+      </div>
     </section>
 
     <div v-if="showKnowledgeModal" class="action-modal">
@@ -414,26 +428,26 @@
       <div class="action-modal__backdrop" @click="closeEventModal" />
       <form class="action-modal__panel" @submit.prevent="submitEvent">
         <header>
-          <h3 class="text-lg font-semibold text-slate-900">记录课堂事件</h3>
-          <p class="text-sm text-slate-500">用自己的话记录课堂/作业进度，方便后续回顾。</p>
+          <h3 class="text-lg font-semibold text-slate-900">补充学习需求 / 步骤</h3>
+          <p class="text-sm text-slate-500">把你希望老师/助教如何讲、哪些没听懂、要调整的顺序记下来，方便后续执行。</p>
         </header>
         <div class="grid gap-3">
           <label class="text-xs text-slate-500">
-            事件类型
+            类型
             <select v-model="eventForm.event_type" class="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-800">
-              <option value="note">课堂记录</option>
-              <option value="practice">练习布置</option>
-              <option value="question">学生提问</option>
-              <option value="timeline">教学进度</option>
+              <option value="note">学习备注</option>
+              <option value="practice">练习计划</option>
+              <option value="question">疑问/补充说明</option>
+              <option value="timeline">学习步骤</option>
             </select>
           </label>
           <label class="text-xs text-slate-500">
-            执行人
+            讲解人 / 学习者
             <input
               v-model="eventForm.actor"
               class="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-800"
               type="text"
-              placeholder="如：王老师 / 小组长 / 学生"
+              placeholder="如：助教 / 老师 / 学生"
             />
           </label>
           <label class="text-xs text-slate-500">
@@ -542,6 +556,19 @@ const draggingEventIndex = ref<number | null>(null);
 const timelineLoading = ref(false);
 const timelineError = ref("");
 const pollTimer = ref<number | null>(null);
+const encouragements = [
+  { message: "愈坚决，愈能胜利。", sub: "坚持到底，困难自然退让。" },
+  { message: "一切困难都是纸老虎。", sub: "拆开来看，就没有过不去的坎。" },
+  { message: "雄关漫道真如铁，而今迈步从头越。", sub: "跨过去，风景就在前面。" },
+  { message: "无限风光在险峰。", sub: "越是挑战，越能看得更远。" },
+  { message: "世上无难事，只要肯登攀。", sub: "再难的知识点，也能一点点攻克。" },
+  { message: "不到长城非好汉。", sub: "学到关键处，坚持就是胜利。" },
+  { message: "要压倒一切困难，绝不被困难所屈服。", sub: "别低头，困难就会低头。" },
+  { message: "前途是光明的，道路是曲折的。", sub: "弯路不可怕，方向对就能走到终点。" },
+  { message: "星星之火，可以燎原。", sub: "每次学习都是在积累能量。" },
+  { message: "数风流人物，还看今朝。", sub: "专注当下，这一刻的努力最重要。" },
+];
+const encouragement = ref(encouragements[Math.floor(Math.random() * encouragements.length)]);
 
 const knowledgeBases = ref<KnowledgeBaseItem[]>([]);
 const selectedKnowledgeBase = ref<string | number>("");
@@ -651,7 +678,7 @@ const pipelineSummary = computed(() => {
     return "任务失败，请调整输入后重试。";
   }
   if (job.value?.status && ["completed", "completed_with_fallback"].includes(job.value.status)) {
-    return "课程已生成，可查看课程总览或执行行动指南。";
+    return "课程已生成，可查看课程总览或学习指导。";
   }
   if (jobTicket.value && !job.value) {
     return "学习助手已接单，正在排队或执行。";
@@ -712,7 +739,7 @@ const agentProgress = computed(() => {
       label: "辅导助手",
       value: `${practiceCount.value} 条练习`,
       detail: "练习提示与推荐",
-      note: job.value ? "行动建议已回传到行动指南" : "等待多智能体协同输出",
+      note: job.value ? "学习步骤已同步到学习指导" : "等待多智能体协同输出",
       progress: job.value ? Math.min(100, Math.max(40, practiceCount.value * 15)) : jobTicket.value ? 30 : 10,
       state: tutorState,
     },
@@ -1053,7 +1080,7 @@ function hydrateFromStorage() {
 function afterJobLoaded(detail: PrestudyResponse) {
   actionStatuses.value = getActionStatusMap(detail.id);
   if (!announcedJobIds.value.includes(detail.id)) {
-    appendMessage("system", "课程已生成，可查看课程总览或执行行动指南。", "job");
+    appendMessage("system", "课程已生成，可查看课程总览或学习指导。", "job");
     announcedJobIds.value = [...announcedJobIds.value, detail.id];
     persistAnnouncedJobs();
   }
@@ -1306,20 +1333,20 @@ function stageLabel(stage?: string | null): string {
 function agentLabel(agent?: string | null): string {
   if (!agent) return "学习助手";
   const map: Record<string, string> = {
-    planner: "Planner",
-    rewriter: "Rewriter",
-    tutor: "Tutor",
-    coach: "Coach",
+    planner: "规划",
+    rewriter: "优化",
+    tutor: "练习",
+    coach: "陪学",
   };
   return map[agent] ?? agent;
 }
 
 function formatEventType(eventType: string): string {
   const map: Record<string, string> = {
-    note: "系统备注",
-    practice: "练习",
-    question: "问答",
-    timeline: "节点",
+    note: "学习备注",
+    practice: "练习计划",
+    question: "疑问",
+    timeline: "学习步骤",
   };
   return map[eventType] ?? eventType;
 }
@@ -1436,7 +1463,7 @@ function buildPipelineStages() {
     id: "tutor",
     label: "课堂互动",
     title: practiceCount.value ? `${practiceCount.value} 条行动建议` : "等待互动提示",
-    summary: practiceCount.value ? "练习与 Follow-up 已同步至行动指南。" : "完成课程后会自动生成课堂互动建议。",
+    summary: practiceCount.value ? "练习与 Follow-up 已同步至学习指导。" : "完成课程后会自动生成课堂互动建议。",
     state: tutorState,
     meta: practiceCount.value ? `${practiceCount.value} 条` : "",
   });
