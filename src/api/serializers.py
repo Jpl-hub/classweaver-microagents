@@ -1,9 +1,13 @@
+from django.contrib.auth import get_user_model
 from rest_framework import serializers
+
+
+User = get_user_model()
 
 
 class PrestudyTextSerializer(serializers.Serializer):
     text = serializers.CharField()
-    doc_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
+    base_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     def validate_text(self, value: str) -> str:
         cleaned = value.strip()
@@ -62,7 +66,19 @@ class QuizSubmitRequestSerializer(serializers.Serializer):
 class KnowledgeSearchSerializer(serializers.Serializer):
     query = serializers.CharField()
     top_k = serializers.IntegerField(default=5, min_value=1, max_value=20)
-    doc_ids = serializers.ListField(child=serializers.CharField(), required=False, allow_empty=True)
+    base_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+
+class KnowledgeQaSerializer(serializers.Serializer):
+    question = serializers.CharField()
+    top_k = serializers.IntegerField(default=4, min_value=1, max_value=10)
+    base_id = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+
+
+class KnowledgeBaseSerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+    name = serializers.CharField(max_length=128)
+    description = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
 
 class LessonEventSerializer(serializers.Serializer):
@@ -80,3 +96,26 @@ class RecommendationTaskSerializer(serializers.Serializer):
     id = serializers.CharField()
     status = serializers.CharField()
     output = serializers.JSONField(required=False)
+
+
+class UserSerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+    username = serializers.CharField()
+    email = serializers.EmailField(allow_blank=True, required=False)
+
+
+class RegisterSerializer(serializers.Serializer):
+    username = serializers.CharField(max_length=150)
+    email = serializers.EmailField(allow_blank=True, required=False)
+    password = serializers.CharField(write_only=True)
+
+    def validate_username(self, value: str) -> str:
+        normalized = value.strip()
+        if User.objects.filter(username=normalized).exists():
+            raise serializers.ValidationError("Username is already taken.")
+        return normalized
+
+
+class LoginSerializer(serializers.Serializer):
+    username = serializers.CharField()
+    password = serializers.CharField(write_only=True)

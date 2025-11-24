@@ -110,38 +110,39 @@
           </div>
         </article>
 
-        <article class="rounded border border-slate-200 bg-white p-6 shadow-sm space-y-3">
-          <h3 class="text-lg font-semibold text-slate-800">题目解析</h3>
-          <table class="w-full text-left text-sm">
-            <thead>
-              <tr class="border-b border-slate-200 text-xs uppercase text-slate-500">
-                <th class="py-2">题目</th>
-                <th class="py-2">你的作答</th>
-                <th class="py-2">标准答案</th>
-                <th class="py-2">结果</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="detail in result.detail" :key="detail.id" class="border-b border-slate-100">
-                <td class="py-2 pr-4">{{ findQuestion(detail.id)?.question || "题目" }}</td>
-                <td class="py-2 pr-4">{{ detail.user_answer || "无" }}</td>
-                <td class="py-2 pr-4">{{ detail.answer || "无" }}</td>
-                <td class="py-2">
-                  <span
-                    class="rounded px-2 py-1 text-xs font-semibold"
-                    :class="detail.correct ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'"
-                  >
-                    {{ detail.correct ? "答对" : "答错" }}
-                  </span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <article class="rounded border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+          <header class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-slate-800">题目解析</h3>
+            <p class="text-xs text-slate-500">绿色为答对，红色为待加强。</p>
+          </header>
+          <div class="grid gap-3 md:grid-cols-2">
+            <div
+              v-for="detail in result.detail"
+              :key="detail.id"
+              class="rounded-2xl border p-4 shadow-sm"
+              :class="detail.correct ? 'border-emerald-100 bg-emerald-50/70' : 'border-rose-100 bg-rose-50/70'"
+            >
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-sm font-semibold text-slate-800">{{ findQuestion(detail.id)?.question || "题目" }}</p>
+                <span
+                  class="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em]"
+                  :class="detail.correct ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'"
+                >
+                  {{ detail.correct ? "答对" : "待加强" }}
+                </span>
+              </div>
+              <p class="mt-2 text-xs text-slate-600">
+                你的作答：<strong>{{ detail.user_answer || "未作答" }}</strong> · 标准答案：<strong>{{ detail.answer || "无" }}</strong>
+              </p>
+              <p v-if="detail.explain" class="mt-2 text-sm text-slate-700">{{ detail.explain }}</p>
+              <p v-else class="mt-2 text-xs text-slate-500">暂无解析，回顾课堂内容再试一次。</p>
+            </div>
+          </div>
         </article>
 
         <section v-if="result.diagnostics" class="rounded border border-slate-200 bg-white p-5 shadow-sm">
           <h3 class="text-lg font-semibold text-slate-800">AI 诊断</h3>
-          <p class="mt-1 text-sm text-slate-600">{{ formatDiagnostics(result.diagnostics) }}</p>
+          <p class="mt-1 text-sm text-slate-700 leading-relaxed">{{ formatDiagnostics(result.diagnostics) }}</p>
         </section>
       </section>
     </div>
@@ -251,7 +252,9 @@ function formatDiagnostics(value?: Record<string, unknown>): string {
     return summary;
   }
   try {
-    return JSON.stringify(value, null, 2);
+    const total = (value.raw as Record<string, unknown>)?.total ?? "";
+    const correct = (value.raw as Record<string, unknown>)?.correct ?? "";
+    return `共 ${total} 题，答对 ${correct} 题。针对薄弱知识点重点复盘。`;
   } catch {
     return "请根据测验结果调整复盘节奏。";
   }

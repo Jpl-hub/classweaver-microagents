@@ -20,11 +20,11 @@
             <div>
               <p class="text-sm text-slate-500">资料库概览</p>
               <h2 class="text-xl font-semibold text-slate-900">
-                {{ knowledgeCount > 0 ? `共 ${knowledgeCount} 份资料` : "暂未上传资料" }}
+                {{ knowledgeCount > 0 ? `共 ${knowledgeCount} 个知识库` : "暂未上传资料" }}
               </h2>
             </div>
             <div class="flex flex-wrap gap-2">
-              <button class="btn-secondary" type="button" @click="openKnowledgeUpload">
+              <button class="btn-secondary" type="button" @click="openKnowledgeUpload" :disabled="!selectedKnowledgeBase">
                 上传资料
               </button>
               <button class="btn-ghost text-sm" type="button" :disabled="isLoadingList" @click="syncKnowledgeBasesFromServer">
@@ -38,6 +38,15 @@
               >
                 {{ deletingAll ? "清空中..." : "清空全部知识库" }}
               </button>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 text-sm">
+              <input
+                v-model="newBaseName"
+                class="w-48 rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-400"
+                type="text"
+                placeholder="输入名称创建知识库"
+              />
+              <button class="btn-secondary" type="button" @click="handleCreateBase">新建知识库</button>
             </div>
             <input
               ref="uploadInputRef"
@@ -145,6 +154,26 @@
               尚未检索，可输入问题或知识点后点击“开始检索”查看命中的片段。
             </p>
           </div>
+          <div class="mt-4 rounded-2xl border border-white/70 bg-white/80 p-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-slate-500">当前库内文档</p>
+                <h4 class="text-base font-semibold text-slate-900">{{ documents.length ? `${documents.length} 份` : "暂无文档" }}</h4>
+              </div>
+              <span v-if="isLoadingDocs" class="text-xs text-slate-500">加载中…</span>
+            </div>
+            <ul class="mt-2 space-y-2 max-h-40 overflow-y-auto pr-1">
+              <li
+                v-for="doc in documents"
+                :key="doc.doc_id"
+                class="rounded-xl border border-slate-200/70 bg-white px-3 py-2 text-sm text-slate-700"
+              >
+                <p class="font-semibold text-slate-900">{{ doc.title }}</p>
+                <p class="text-xs text-slate-500">更新时间：{{ doc.updated_at }}</p>
+              </li>
+              <li v-if="!documents.length" class="text-xs text-slate-500">上传资料后会显示在这里。</li>
+            </ul>
+          </div>
         </article>
       </section>
     </div>
@@ -154,32 +183,48 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from "vue";
 import { RouterLink } from "vue-router";
-import { clearKnowledgeDocuments, deleteKnowledgeDocument, listKnowledgeDocuments, searchKnowledge, uploadKnowledge } from "../services/api";
-import type { KnowledgeSearchResult, RagSearchRequest } from "../types";
+import {
+  clearKnowledgeDocuments,
+  deleteKnowledgeBase,
+  createKnowledgeBase,
+  listKnowledgeBases,
+  listKnowledgeDocuments,
+  searchKnowledge,
+  uploadKnowledge,
+} from "../services/api";
+import type { KnowledgeSearchResult, RagSearchRequest, KnowledgeDocumentSummary } from "../types";
 import type { KnowledgeBaseItem } from "../utils/knowledge";
 import {
   DEFAULT_KNOWLEDGE_BASE,
   KNOWLEDGE_BASE_SELECTION_KEY,
   KNOWLEDGE_BASE_STORAGE_KEY,
-  mapDocumentToKnowledgeBase,
+  mapBaseToItem,
   normalizeKnowledgeBaseList,
   resolveKnowledgeBaseName,
 } from "../utils/knowledge";
 
-const knowledgeBases = ref<KnowledgeBaseItem[]>([DEFAULT_KNOWLEDGE_BASE]);
-const selectedKnowledgeBase = ref<string>(DEFAULT_KNOWLEDGE_BASE.id);
+const knowledgeBases = ref<KnowledgeBaseItem[]>([]);
+const selectedKnowledgeBase = ref<string | number>("");
 const knowledgeUploadStatus = ref("");
 const knowledgeSearchQuery = ref("");
 const knowledgeSearchResults = ref<KnowledgeSearchResult[]>([]);
+const documents = ref<KnowledgeDocumentSummary[]>([]);
 const uploadInputRef = ref<HTMLInputElement>();
+const newBaseName = ref("");
 const isLoadingList = ref(false);
+const isLoadingDocs = ref(false);
 const deletingDocId = ref<string | null>(null);
 const deletingAll = ref(false);
 
 const currentKnowledgeBase = computed(() =>
   knowledgeBases.value.find((base) => base.id === selectedKnowledgeBase.value),
 );
-const knowledgeCount = computed(() => Math.max(knowledgeBases.value.length - 1, 0));
+const knowledgeCount = computed(() => knowledgeBases.value.length);
+
+function firstAvailableBaseId(list: KnowledgeBaseItem[]): string | number {
+  const candidate = list.find((base) => String(base.id) !== String(DEFAULT_KNOWLEDGE_BASE.id));
+  return candidate?.id ?? "";
+}
 
 watch(
   [knowledgeBases, selectedKnowledgeBase],
@@ -202,16 +247,16 @@ function restoreKnowledgeBases() {
       }
     }
     const storedSelected = window.sessionStorage.getItem(KNOWLEDGE_BASE_SELECTION_KEY);
-    if (storedSelected && knowledgeBases.value.some((base) => base.id === storedSelected)) {
+    if (storedSelected && knowledgeBases.value.some((base) => String(base.id) === storedSelected)) {
       selectedKnowledgeBase.value = storedSelected;
     } else {
-      selectedKnowledgeBase.value = knowledgeBases.value[0]?.id ?? DEFAULT_KNOWLEDGE_BASE.id;
+      selectedKnowledgeBase.value = firstAvailableBaseId(knowledgeBases.value);
     }
   } catch {
     window.sessionStorage.removeItem(KNOWLEDGE_BASE_STORAGE_KEY);
     window.sessionStorage.removeItem(KNOWLEDGE_BASE_SELECTION_KEY);
-    knowledgeBases.value = [DEFAULT_KNOWLEDGE_BASE];
-    selectedKnowledgeBase.value = DEFAULT_KNOWLEDGE_BASE.id;
+    knowledgeBases.value = [];
+    selectedKnowledgeBase.value = "";
   }
 }
 
@@ -220,19 +265,23 @@ function persistKnowledgeBases() {
     return;
   }
   window.sessionStorage.setItem(KNOWLEDGE_BASE_STORAGE_KEY, JSON.stringify(knowledgeBases.value));
-  window.sessionStorage.setItem(KNOWLEDGE_BASE_SELECTION_KEY, selectedKnowledgeBase.value);
+  window.sessionStorage.setItem(KNOWLEDGE_BASE_SELECTION_KEY, String(selectedKnowledgeBase.value));
 }
 
 async function syncKnowledgeBasesFromServer() {
   isLoadingList.value = true;
   try {
-    const resp = await listKnowledgeDocuments();
-    const serverList = (resp.documents ?? []).map(mapDocumentToKnowledgeBase);
+    const resp = await listKnowledgeBases();
+    const serverList = (resp.bases ?? []).map(mapBaseToItem);
     const normalized = normalizeKnowledgeBaseList(serverList);
     knowledgeBases.value = normalized;
-    if (!normalized.some((base) => base.id === selectedKnowledgeBase.value)) {
-      selectedKnowledgeBase.value = normalized[0]?.id ?? DEFAULT_KNOWLEDGE_BASE.id;
+    const fallback = firstAvailableBaseId(normalized);
+    if (!selectedKnowledgeBase.value && fallback) {
+      selectedKnowledgeBase.value = fallback;
+    } else if (!normalized.some((base) => String(base.id) === String(selectedKnowledgeBase.value))) {
+      selectedKnowledgeBase.value = fallback;
     }
+    await loadDocuments();
   } catch (error) {
     console.warn("获取知识库列表失败", error);
   } finally {
@@ -240,24 +289,33 @@ async function syncKnowledgeBasesFromServer() {
   }
 }
 
+async function loadDocuments() {
+  isLoadingDocs.value = true;
+  try {
+    const resp = await listKnowledgeDocuments(selectedKnowledgeBase.value);
+    documents.value = resp.documents ?? [];
+  } catch (error) {
+    console.warn("获取文档列表失败", error);
+  } finally {
+    isLoadingDocs.value = false;
+  }
+}
+
 async function handleKnowledgeUpload(event: Event) {
   const target = event.target as HTMLInputElement;
   const files = target.files ? Array.from(target.files).filter(Boolean) : [];
   if (!files.length) return;
+  if (!selectedKnowledgeBase.value) {
+    knowledgeUploadStatus.value = "请先选择或创建一个知识库。";
+    target.value = "";
+    return;
+  }
   knowledgeUploadStatus.value = "上传中…";
   try {
-    const summary = await uploadKnowledge(files);
-    const additions = (summary.documents ?? []).map(mapDocumentToKnowledgeBase);
-    if (!additions.length) {
-      knowledgeUploadStatus.value = "上传成功，但未收到文档 ID，请稍后刷新";
-      await syncKnowledgeBasesFromServer();
-      return;
-    }
-    knowledgeBases.value = normalizeKnowledgeBaseList([...knowledgeBases.value, ...additions]);
-    selectedKnowledgeBase.value = additions.at(-1)?.id ?? selectedKnowledgeBase.value;
-    const names = additions.map((item) => item.name).filter(Boolean).join("、");
-    knowledgeUploadStatus.value = `已上传 ${names || `${files.length} 份资料`}`;
+    await uploadKnowledge(files, selectedKnowledgeBase.value);
+    knowledgeUploadStatus.value = `上传完成，共 ${files.length} 份资料`;
     await syncKnowledgeBasesFromServer();
+    await loadDocuments();
   } catch (error) {
     knowledgeUploadStatus.value = (error as Error).message ?? "上传失败";
   } finally {
@@ -271,13 +329,32 @@ function openKnowledgeUpload() {
 
 function setActiveKnowledgeBase(id: string) {
   selectedKnowledgeBase.value = id;
+  loadDocuments();
+}
+
+async function handleCreateBase() {
+  const name = newBaseName.value.trim();
+  if (!name) {
+    knowledgeUploadStatus.value = "请输入知识库名称后创建。";
+    return;
+  }
+  try {
+    const base = await createKnowledgeBase(name);
+    knowledgeBases.value = normalizeKnowledgeBaseList([...knowledgeBases.value, mapBaseToItem(base)]);
+    selectedKnowledgeBase.value = base.id;
+    newBaseName.value = "";
+    await loadDocuments();
+    knowledgeUploadStatus.value = `已创建知识库「${base.name}」`;
+  } catch (error) {
+    knowledgeUploadStatus.value = (error as Error).message ?? "创建失败";
+  }
 }
 
 async function handleDelete(docId: string) {
   deletingDocId.value = docId;
   knowledgeUploadStatus.value = "";
   try {
-    await deleteKnowledgeDocument(docId);
+    await deleteKnowledgeBase(docId);
     await syncKnowledgeBasesFromServer();
   } catch (error) {
     knowledgeUploadStatus.value = (error as Error).message ?? "删除失败";
@@ -292,6 +369,7 @@ async function handleClearAll() {
   try {
     await clearKnowledgeDocuments();
     await syncKnowledgeBasesFromServer();
+    documents.value = [];
   } catch (error) {
     knowledgeUploadStatus.value = (error as Error).message ?? "清空失败";
   } finally {
@@ -301,11 +379,15 @@ async function handleClearAll() {
 
 async function handleKnowledgeSearch() {
   if (!knowledgeSearchQuery.value.trim()) return;
-  const payload: RagSearchRequest = { query: knowledgeSearchQuery.value.trim(), top_k: 5 };
-  const docIds = selectedKnowledgeBase.value !== DEFAULT_KNOWLEDGE_BASE.id ? [selectedKnowledgeBase.value] : [];
-  if (docIds.length) {
-    payload.doc_ids = docIds;
+  if (!selectedKnowledgeBase.value) {
+    knowledgeUploadStatus.value = "请先选择要检索的知识库。";
+    return;
   }
+  const payload: RagSearchRequest = {
+    query: knowledgeSearchQuery.value.trim(),
+    top_k: 5,
+    base_id: selectedKnowledgeBase.value !== DEFAULT_KNOWLEDGE_BASE.id ? selectedKnowledgeBase.value : undefined,
+  };
   const resp = await searchKnowledge(payload);
   knowledgeSearchResults.value = resp.results;
 }
@@ -329,5 +411,6 @@ const renderRefs = (
 onMounted(async () => {
   restoreKnowledgeBases();
   await syncKnowledgeBasesFromServer();
+  await loadDocuments();
 });
 </script>

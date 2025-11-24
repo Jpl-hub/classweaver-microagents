@@ -93,8 +93,8 @@ def _guess_filesize(file_obj: Any) -> Optional[int]:
 
 
 @transaction.atomic
-def ingest_documents(*, files: Iterable[Any]) -> Dict[str, Any]:
-    """Ingest uploaded documents, create knowledge chunks, and persist embeddings."""
+def ingest_documents(*, files: Iterable[Any], base) -> Dict[str, Any]:
+    """Ingest uploaded documents into a knowledge base, create chunks, and persist embeddings."""
     agent_settings = settings.AGENT_SETTINGS
     backend = agent_settings["vector_backend"]
     store = get_store(backend)
@@ -126,6 +126,8 @@ def ingest_documents(*, files: Iterable[Any]) -> Dict[str, Any]:
             "source": name,
         }
         document = KnowledgeDocument.objects.create(
+            user=base.user,
+            base=base,
             doc_id=doc_id,
             title=title,
             source_path=name,
@@ -146,6 +148,7 @@ def ingest_documents(*, files: Iterable[Any]) -> Dict[str, Any]:
             chunk_records.append(
                 {
                     "doc_id": doc_id,
+                    "base_id": base.pk,
                     "chunk_id": chunk_id,
                     "text": chunk,
                     "metadata": {
@@ -177,6 +180,7 @@ def ingest_documents(*, files: Iterable[Any]) -> Dict[str, Any]:
             "doc_id": record["doc_id"],
             "chunk_id": record["chunk_id"],
             "text": record["text"],
+            "base_id": base.pk,
             "title": record["document"].title,
             "metadata": record["metadata"],
         }
@@ -190,6 +194,7 @@ def ingest_documents(*, files: Iterable[Any]) -> Dict[str, Any]:
             "doc_id": doc["doc_id"],
             "title": doc["title"],
             "updated_at": doc["updated_at"],
+            "base_id": base.pk,
             "metadata": doc.get("metadata", {}),
         }
         for doc in documents_summary

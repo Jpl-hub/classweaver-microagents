@@ -110,6 +110,7 @@ export interface KnowledgeDocumentSummary {
   doc_id: string;
   title: string;
   updated_at: string;
+  base_id?: number;
   metadata?: Record<string, unknown>;
 }
 
@@ -120,7 +121,18 @@ export interface KnowledgeDocumentListResponse {
 export interface RagSearchRequest {
   query: string;
   top_k: number;
-  doc_ids?: string[];
+  base_id?: string | number;
+}
+
+export interface KnowledgeQaResponse {
+  answer: string;
+  contexts: KnowledgeSearchResult[];
+}
+
+export interface KnowledgeBase {
+  id: number;
+  name: string;
+  description?: string;
 }
 
 export interface LessonEventEntry {
@@ -164,4 +176,10 @@ export interface RecommendationTaskResponse {
   id: string;
   status: string;
   output: RecommendationPayload;
+}
+
+export interface UserProfile {
+  id: number;
+  username: string;
+  email?: string;
 }

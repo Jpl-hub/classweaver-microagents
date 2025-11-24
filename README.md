@@ -1,30 +1,34 @@
-# ClassWeaver Micro-Agents（中文版）
+# ClassWeaver Micro-Agents
 
-ClassWeaver 是基于 Planner / Rewriter / Tutor / Timeline 的多智能体教学编排系统，提供课程生成、知识库检索、课堂测验、陪学教练、打印讲义等功能。本版本已全面中文化，支持自建知识库的增删改查，并强制生成中文内容。
+ClassWeaver 是一个基于 Planner / Rewriter / Tutor / Timeline 的学习助手系统，支持课程生成、知识库问答、练习测验、推荐与打印等功能。V3 分支默认使用 MySQL，并补充了登录 / 注册能力。
 
 ## 关键特性
-- **多智能体流水线**：Planner 拆解知识点与测验大纲，Rewriter 精炼题目，Tutor 生成练习与总结，支持实时状态轮询与模型调用轨迹。
-- **知识库 + RAG**：上传 PDF/DOCX/PPTX/TXT 等资料，自动切片向量化；任务可指定 `doc_ids`，知识搜索与生成均可绑定指定库。
-- **测验与教练**：随时发起测验（题目/会话持久化），陪学教练按场景导航知识点、练习与行动。
-- **讲义打印与行动清单**：打印知识点/术语/测验/练习；行动推荐支持记录状态、写入时间线和教学事件。
-- **中文输出与去重提醒**：所有 Agent 提示强制中文；“课程已生成”提示仅对同一任务播报一次并持久化去重。
-- **知识库管理**：前端支持删除单个知识库或一键清空（默认库不可删），后端提供 `/api/kb/documents/` `DELETE` 接口。
+- **多智能体流程**：Planner 规划内容，Rewriter 优化表述，Tutor 负责练习与总结。
+- **知识库 + RAG**：按“知识库/文件夹”分组上传 PDF/DOCX/PPTX/TXT，检索严格限定在当前用户的当前知识库。
+- **学习记录与时间线**：课程、测验、事件写入时间线，可拖拽调整顺序；打印讲义一键生成。
+- **账户隔离**：所有业务接口需登录，会话基于 Cookie + CSRF；前端缓存登录态，接口 401 会清空缓存并要求重新登录。
+- **前后端联动**：Django REST API + Vue3 前端（含登录/注册/知识库/时间线/打印视图）。
 
 ## 目录结构
-- `src/agents/`：Planner/Rewrite/Tutor 逻辑与提示模板。
-- `src/api/`：DRF API 视图与序列化，知识库/课程/测验/推荐/时间线接口。
-- `src/services/`：流水线、打印、PPT 解析、推荐、评分等服务。
-- `webapp/src/views/`：Vue3 前端页面（Home/Knowledge/Coach/Take/Print/History）。
-- `webapp/src/services/api.ts`：前端 API 客户端（包含 locale/语言头、知识库删除接口）。
-- `docs/`：`用户手册.md`、`需求说明.md`、`详细设计.md`。
+- `src/agents/`：Planner/Rewrite/Tutor 示例逻辑。
+- `src/api/`：Django REST API（知识库、课程、推荐等）。
+- `src/services/`：打印、PPT、推荐、评分等服务。
+- `webapp/src/views/`：Vue3 前端页面（Home/Knowledge/Coach/Take/Print/History/Login/Register）。
+- `webapp/src/services/api.ts`：前端 API 客户端（含 locale、知识库、鉴权等）。
+- `docs/`：说明文档。
 
-## 快速开始
+## 赶快开始
+> 默认使用 MySQL 8+，请先准备数据库并配置好环境变量；FAISS 索引与切片文件已在 .gitignore 中。
+
 ### 后端
+1. 创建 MySQL 数据库（默认名 `classweaver`），在 `.env` 设置 `MYSQL_DATABASE/MYSQL_USER/MYSQL_PASSWORD/MYSQL_HOST/MYSQL_PORT`，或直接使用 `DATABASE_URL=mysql://user:pass@host:3306/dbname`。
+2. 安装并启动：
 ```bash
 python -m venv .venv
 . .venv/Scripts/activate   # Windows
-pip install -r requirements.txt
-cp .env.example .env       # 配置数据库/模型等
+pip install -r requirements.txt    # 包含 mysqlclient
+cp .env.example .env
+python manage.py makemigrations core   # 表最小化：未启用 Django admin
 python manage.py migrate
 python manage.py runserver 0.0.0.0:8000
 ```
@@ -33,24 +37,29 @@ python manage.py runserver 0.0.0.0:8000
 ```bash
 cd webapp
 npm install
-cp .env.example .env       # 配置 API base 等
-npm run dev -- --host      # 开发
-npm run build              # 生产构建（dist 已使用最新代码）
+cp .env.example .env       # 设置 API base
+npm run dev -- --host
+npm run build              # 生成 dist 用于部署
 ```
 
-### 知识库操作
-- 上传：在“知识库”页选择文件（支持 TXT/PDF/DOCX/PPTX），后台写入 `KnowledgeDocument/Chunk` 与向量库。
-- 绑定：在首页下拉选择要使用的知识库，生成任务会携带 `doc_ids`；知识搜索也会过滤到选定库。
-- 删除：在“知识库”页可删除单个知识库或“清空全部知识库”（默认库不可删），对应接口 `DELETE /api/kb/documents/<doc_id>/` 与 `DELETE /api/kb/documents/`。
+### 知识库
+- 知识库/文件夹：先创建知识库，再向该库上传多个文件；同一用户的库彼此独立。
+- API：`GET/POST /api/kb/bases/` 列表/创建库；`DELETE /api/kb/bases/<base_id>/` 删除库（级联文件）。
+- 上传：`POST /api/kb/upload/` 携带 `base_id`（若不传自动使用“默认知识库”），上传 TXT/PDF/DOCX/PPTX；后台写入 `KnowledgeBase -> KnowledgeDocument -> KnowledgeChunk`。
+- 检索：`POST /api/kb/search/` 必须带 `base_id`，仅在当前用户该库内检索；向量召回后再按库/文档过滤，避免错库。
+- 删除：`DELETE /api/kb/documents/` 清空当前用户所有文件；`DELETE /api/kb/documents/<doc_id>?base_id=<id>` 删除指定库的单个文件。
+
+### 登录 / 注册
+- API：`POST /api/auth/register/`、`POST /api/auth/login/`、`POST /api/auth/logout/`、`GET /api/auth/me/`
+- 前端：`/login`、`/register`；登录后会话 Cookie 自动携带。若接口返回 401，会自动清理前端缓存并跳转登录。
+
+### 前端小提示
+- 打印、时间线、知识库等路由都依赖登录态；刷新不会丢失缓存，会话失效时会在下次接口调用时要求重新登录。
+- 时间线支持拖拽排序，卡片整块跟随移动；滚动区已放大到便于查看。
 
 ## 测试
-当前环境未安装后端依赖（`django`, `djangorestframework`, `openai` 等），`pytest -q` 会因缺依赖报错。安装 `requirements.txt` 后再运行：
-```bash
-pytest -q              # 后端测试
-cd webapp && npm run build   # 前端构建验证
-```
+后端：`pytest -q`（测试已自动使用内存 SQLite，默认无需 MySQL；若想连真实库，可先导出 `DATABASE_URL`）。前端：`npm run build`。
 
-## 常见问题
-- **生成仍出现英文**：请先清空旧知识库/任务，确保前端已重建，后台加载了最新 Agent 提示；需要模型遵循 `locale=zh-CN` 和中文 prompt。
-- **重复“课程已生成”**：已在前端去重并持久化；如仍重复，清空浏览器 sessionStorage 再试。
-- **知识库异常或旧数据**：使用“清空全部知识库”后重新上传，再重新生成课程/测验。***
+## 其他提示
+- 保持 `Accept-Language=zh-CN` 以获得中文输出。
+- 前端 fetch 默认 `credentials: include`，跨域时需注意 CORS 与同源策略。

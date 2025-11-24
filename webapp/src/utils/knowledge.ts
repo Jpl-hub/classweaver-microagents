@@ -1,7 +1,7 @@
-import type { KnowledgeDocumentSummary } from "../types";
+import type { KnowledgeBase, KnowledgeDocumentSummary } from "../types";
 
 export interface KnowledgeBaseItem {
-  id: string;
+  id: string | number;
   name: string;
   updated: string;
   size: string;
@@ -11,10 +11,10 @@ export const KNOWLEDGE_BASE_STORAGE_KEY = "classweaver:knowledge-bases";
 export const KNOWLEDGE_BASE_SELECTION_KEY = "classweaver:knowledge-base-current";
 
 export const DEFAULT_KNOWLEDGE_BASE: KnowledgeBaseItem = {
-  id: "__default__",
-  name: "无知识库",
-  updated: "刚刚",
-  size: "2.3 MB",
+  id: "",
+  name: "请选择知识库",
+  updated: "",
+  size: "",
 };
 
 export function formatRelativeTime(value?: string): string {
@@ -79,13 +79,25 @@ export function mapDocumentToKnowledgeBase(doc: KnowledgeDocumentSummary): Knowl
   };
 }
 
+export function mapBaseToItem(base: KnowledgeBase): KnowledgeBaseItem {
+  return {
+    id: base.id,
+    name: base.name || `知识库 ${base.id}`,
+    updated: "刚刚",
+    size: "-",
+  };
+}
+
 export function normalizeKnowledgeBaseList(list: KnowledgeBaseItem[]): KnowledgeBaseItem[] {
   const seen = new Set<string>();
   const result: KnowledgeBaseItem[] = [];
   [DEFAULT_KNOWLEDGE_BASE, ...list].forEach((item) => {
     if (!item) return;
+    const rawId = item.id ?? "";
     const normalizedId =
-      item.id === DEFAULT_KNOWLEDGE_BASE.name || item.id === DEFAULT_KNOWLEDGE_BASE.id ? DEFAULT_KNOWLEDGE_BASE.id : item.id?.trim();
+      rawId === DEFAULT_KNOWLEDGE_BASE.name || rawId === DEFAULT_KNOWLEDGE_BASE.id
+        ? DEFAULT_KNOWLEDGE_BASE.id
+        : String(rawId).trim();
     if (!normalizedId) return;
     if (seen.has(normalizedId)) return;
     seen.add(normalizedId);
@@ -108,15 +120,16 @@ export function normalizeKnowledgeBaseList(list: KnowledgeBaseItem[]): Knowledge
 }
 
 export function resolveKnowledgeBaseName(
-  docId: string | null | undefined,
+  docId: string | number | null | undefined,
   bases: KnowledgeBaseItem[],
   fallback?: string,
 ): string {
   if (!docId) {
     return fallback ?? "知识库";
   }
-  const match = bases.find((base) => base.id === docId);
+  const key = String(docId);
+  const match = bases.find((base) => String(base.id) === key);
   if (match) return match.name;
   if (fallback) return fallback;
-  return docId.length > 8 ? `资料 ${docId.slice(0, 6).toUpperCase()}` : docId.toUpperCase();
+  return key.length > 8 ? `资料 ${key.slice(0, 6).toUpperCase()}` : key.toUpperCase();
 }
