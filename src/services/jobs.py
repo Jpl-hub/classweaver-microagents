@@ -18,13 +18,11 @@ def enqueue_prestudy_job(
     text: Optional[str] = None,
     ppt_bytes: Optional[bytes] = None,
     filename: str = "",
-    doc_ids: Optional[list[str]] = None,
 ) -> None:
     """Dispatch prestudy pipeline到后台线程，避免阻塞请求。"""
 
     job.status = "queued"
-    job.knowledge_doc_ids = doc_ids or []
-    job.save(update_fields=["status", "knowledge_doc_ids"])
+    job.save(update_fields=["status"])
 
     thread = threading.Thread(
         target=_run_prestudy_job,
@@ -51,7 +49,7 @@ def _run_prestudy_job(job_id: int, text: Optional[str], ppt_bytes: Optional[byte
     try:
         job.status = "processing"
         job.save(update_fields=["status"])
-        pipeline.run_pipeline(job=job, text=text, ppt_file=ppt_file, doc_ids=job.knowledge_doc_ids or None)
+        pipeline.run_pipeline(job=job, text=text, ppt_file=ppt_file)
     except Exception as exc:  # noqa: BLE001
         logger.exception("Prestudy pipeline failed for job %s", job_id)
         job.status = "failed"

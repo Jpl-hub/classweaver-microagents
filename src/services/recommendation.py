@@ -23,7 +23,6 @@ def generate_recommendations(*, job, session: Optional[Any] = None) -> Dict[str,
     """Build personalized multi-agent playbook suggestions."""
     plan: LessonPlan | None = getattr(job, 'lesson_plan', None)
     final_json: Dict[str, Any] = job.final_json or {}
-    knowledge_ids: List[str] = job.knowledge_doc_ids or []
 
     focus_points = final_json.get('knowledge_points') or []
     quiz_items = (final_json.get('quiz') or {}).get('items', [])
@@ -72,7 +71,6 @@ def generate_recommendations(*, job, session: Optional[Any] = None) -> Dict[str,
                 'title': '写入课堂节奏',
                 'summary': '把 Planner 的知识节点与互动动作同步到时间线，方便课堂跟进。',
                 'action': '在课堂节奏面板登记一条互动节点',
-                'doc_ids': knowledge_ids,
             }
         )
 

@@ -125,6 +125,22 @@
         </div>
 
         <div class="flex flex-wrap items-center gap-3 text-xs text-slate-600">
+          <div class="flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-2 py-1">
+            <button
+              v-for="mode in chatModes"
+              :key="mode.id"
+              type="button"
+              class="rounded-full px-3 py-1 text-xs font-semibold transition"
+              :class="
+                chatMode === mode.id
+                  ? 'bg-slate-900 text-white shadow'
+                  : 'bg-transparent text-slate-600 hover:bg-slate-100'
+              "
+              @click="chatMode = mode.id"
+            >
+              {{ mode.label }}
+            </button>
+          </div>
           <label class="btn-secondary !px-3 !py-1 text-xs">
             附加文件
             <input
@@ -168,7 +184,7 @@
             <button class="btn-secondary" type="button" :disabled="sendingMessage" @click="openKnowledgeView">管理知识库</button>
             <button class="btn-secondary" type="button" :disabled="sendingMessage" @click="clearChatInput">清空</button>
             <button class="btn-primary" type="submit" :disabled="sendingMessage">
-              {{ sendingMessage ? '发送中...' : '发送到多智能体' }}
+              {{ sendingMessage ? '发送中...' : chatMode === 'knowledge' ? '发送' : '发送到多智能体' }}
             </button>
           </div>
           <p v-if="chatError" class="text-sm text-rose-600">{{ chatError }}</p>
@@ -308,7 +324,7 @@
           </div>
         </article>
       </article>
-      <article class="glass-panel space-y-4">
+      <article class="glass-panel space-y-4 flex flex-col">
         <header class="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p class="text-xs uppercase tracking-[0.4em] text-slate-500">教学方案</p>
@@ -319,26 +335,36 @@
             <button class="btn-ghost text-xs" type="button" @click="openEventModal()">记录教学事件</button>
           </div>
         </header>
-        <div v-if="timelineLoading" class="text-sm text-slate-500">时间线加载中...</div>
-        <ul v-else class="space-y-3 max-h-[360px] overflow-y-auto pr-1">
-          <li
-            v-for="event in timelineEvents"
+        <div v-if="timelineLoading" class="text-sm text-slate-500 flex-1 min-h-[520px]">时间线加载中...</div>
+        <div
+          v-else
+          class="grid gap-3 md:grid-cols-1 flex-1 min-h-[520px] max-h-[720px] overflow-y-auto pr-1"
+        >
+          <div
+            v-for="(event, index) in timelineEvents"
             :key="event.id"
-            class="rounded-2xl border border-white/70 bg-white/80 p-4"
+            class="relative cursor-move rounded-2xl p-4 text-sm shadow transition-transform duration-150"
+            :class="{ 'ring-2 ring-white/80 scale-[1.01]': draggingEventIndex === index }"
+            :style="eventCardStyle(index)"
+            draggable="true"
+            @dragstart="onEventDragStart(index)"
+            @dragover.prevent
+            @drop="onEventDrop(index)"
+            @dragend="onEventDragEnd"
           >
-            <div class="flex items-center justify-between text-xs uppercase tracking-[0.3em] text-slate-500">
+            <div class="flex items-center justify-between text-[11px] uppercase tracking-[0.25em] text-slate-50/90">
               <span>{{ formatEventType(event.event_type) }}</span>
               <span>{{ formatEventTime(event.occurred_at) }}</span>
             </div>
-            <p class="text-base font-semibold text-slate-900">
-              {{ event.payload?.title || event.payload?.note || '教学事件' }}
+            <p class="mt-2 text-lg font-semibold text-white drop-shadow">
+              {{ event.payload?.title || event.payload?.note || '课堂记录' }}
             </p>
-            <p class="text-xs text-slate-500">
+            <p class="mt-1 text-xs text-slate-50/90">
               {{ event.payload?.summary || '系统自动记录' }}
             </p>
-          </li>
-          <li v-if="!timelineEvents.length" class="text-xs text-slate-500">暂无事件，执行行动后会自动补齐。</li>
-        </ul>
+          </div>
+          <div v-if="!timelineEvents.length" class="col-span-2 text-xs text-slate-500">暂无事件，执行行动后会自动补齐。</div>
+        </div>
       </article>
     </section>
 
@@ -389,38 +415,48 @@
       <form class="action-modal__panel" @submit.prevent="submitEvent">
         <header>
           <h3 class="text-lg font-semibold text-slate-900">记录课堂事件</h3>
-          <p class="text-sm text-slate-500">填写详细信息方便追踪行动状态。</p>
+          <p class="text-sm text-slate-500">用自己的话记录课堂/作业进度，方便后续回顾。</p>
         </header>
         <div class="grid gap-3">
           <label class="text-xs text-slate-500">
             事件类型
             <select v-model="eventForm.event_type" class="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-800">
-              <option value="note">Note</option>
-              <option value="practice">Practice</option>
-              <option value="question">Question</option>
-              <option value="timeline">Timeline</option>
+              <option value="note">课堂记录</option>
+              <option value="practice">练习布置</option>
+              <option value="question">学生提问</option>
+              <option value="timeline">教学进度</option>
             </select>
           </label>
           <label class="text-xs text-slate-500">
             执行人
-            <input v-model="eventForm.actor" class="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-800" type="text" />
+            <input
+              v-model="eventForm.actor"
+              class="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-800"
+              type="text"
+              placeholder="如：王老师 / 小组长 / 学生"
+            />
           </label>
           <label class="text-xs text-slate-500">
             描述
             <textarea
               v-model="eventForm.summary"
               class="mt-1 h-24 w-full resize-none rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-800"
-              placeholder="发生了什么？"
+              placeholder="发生了什么？有何结论或下一步？"
             ></textarea>
           </label>
           <label class="text-xs text-slate-500">
-            action_id（可选）
-            <input v-model="eventForm.action_id" class="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-800" type="text" />
+            关联行动（可选）
+            <input
+              v-model="eventForm.action_id"
+              class="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-800"
+              type="text"
+              placeholder="可选，关联到推荐卡片 ID"
+            />
           </label>
           <label class="text-xs text-slate-500">
             状态
             <select v-model="eventForm.status" class="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2 text-sm text-slate-800">
-              <option value="pending">待执行</option>
+              <option value="pending">待跟进</option>
               <option value="running">进行中</option>
               <option value="completed">已完成</option>
             </select>
@@ -444,9 +480,10 @@ import {
   getLessonTimeline,
   getPrestudyJob,
   getPrestudyJobStatus,
-  listKnowledgeDocuments,
+  listKnowledgeBases,
   postLessonEvent,
   searchKnowledge,
+  knowledgeQa,
   startQuiz,
   triggerRecommendations,
 } from "../services/api";
@@ -456,7 +493,7 @@ import {
   KNOWLEDGE_BASE_SELECTION_KEY,
   KNOWLEDGE_BASE_STORAGE_KEY,
   type KnowledgeBaseItem,
-  mapDocumentToKnowledgeBase,
+  mapBaseToItem,
   normalizeKnowledgeBaseList,
   resolveKnowledgeBaseName,
 } from "../utils/knowledge";
@@ -501,12 +538,13 @@ const isLoadingRecommendations = ref(false);
 const recommendationError = ref("");
 
 const timelineEvents = ref<LessonEventEntry[]>([]);
+const draggingEventIndex = ref<number | null>(null);
 const timelineLoading = ref(false);
 const timelineError = ref("");
 const pollTimer = ref<number | null>(null);
 
-const knowledgeBases = ref<KnowledgeBaseItem[]>([DEFAULT_KNOWLEDGE_BASE]);
-const selectedKnowledgeBase = ref<string>(DEFAULT_KNOWLEDGE_BASE.id);
+const knowledgeBases = ref<KnowledgeBaseItem[]>([]);
+const selectedKnowledgeBase = ref<string | number>("");
 const knowledgeSyncing = ref(false);
 const knowledgeStatus = ref("尚未同步");
 const showKnowledgeModal = ref(false);
@@ -521,6 +559,11 @@ const mcpProfile = reactive({
 const selectedKnowledgeBaseName = computed(() =>
   resolveKnowledgeBaseName(selectedKnowledgeBase.value, knowledgeBases.value, DEFAULT_KNOWLEDGE_BASE.name),
 );
+
+function firstAvailableBaseId(list: KnowledgeBaseItem[]): string | number {
+  const candidate = list.find((base) => String(base.id) !== String(DEFAULT_KNOWLEDGE_BASE.id));
+  return candidate?.id ?? "";
+}
 
 const actionStatuses = ref<Record<string, ActionStatusEntry>>({});
 const isLaunchingQuiz = ref(false);
@@ -570,14 +613,17 @@ const practiceCount = computed(() => {
 const knowledgeModalPoints = computed(() => toArray(job.value?.final_json?.knowledge_points));
 
 const attachedDocIds = computed(() => {
-  const ids = new Set<string>();
   if (selectedKnowledgeBase.value && selectedKnowledgeBase.value !== DEFAULT_KNOWLEDGE_BASE.id) {
-    ids.add(selectedKnowledgeBase.value);
+    return [String(selectedKnowledgeBase.value)];
   }
-  return Array.from(ids);
+  return [];
 });
 
-const activeDocNames = computed(() => attachedDocIds.value.map((id) => docChipLabel(id)).filter(Boolean));
+const activeDocNames = computed(() =>
+  selectedKnowledgeBase.value && selectedKnowledgeBase.value !== DEFAULT_KNOWLEDGE_BASE.id
+    ? [docChipLabel(selectedKnowledgeBase.value)]
+    : []
+);
 const lastUpdatedDisplay = computed(() => {
   if (!persistedTimestamp.value) return "刚刚";
   return formatRelativeTime(persistedTimestamp.value);
@@ -767,7 +813,8 @@ function statusText(value?: string): string {
 }
 
 function docChipLabel(docId: string): string {
-  return resolveKnowledgeBaseName(docId, knowledgeBases.value, `Doc ${docId.slice(0, 4)}`);
+  const key = String(docId);
+  return resolveKnowledgeBaseName(key, knowledgeBases.value, `Doc ${key.slice(0, 4)}`);
 }
 
 function stagePillClass(state: StageState) {
@@ -847,21 +894,18 @@ async function handleKnowledgeQuery(query: string) {
     chatError.value = "请输入关键词以追问知识库";
     return;
   }
+  if (!selectedKnowledgeBase.value) {
+    chatError.value = "请先选择一个知识库";
+    return;
+  }
   appendMessage("user", query);
   try {
-    const payload = { query: query.trim(), top_k: 4, doc_ids: attachedDocIds.value };
-    const resp = await searchKnowledge(payload);
-    if (!resp.results.length) {
+    const resp = await knowledgeQa(query.trim(), selectedKnowledgeBase.value || undefined, 4);
+    if (!resp?.answer) {
       appendMessage("system", "知识库中没有找到相关内容。", "knowledge");
       return;
     }
-    const rendered = resp.results
-      .map((item, index) => {
-        const ref = item.refs?.[0];
-        const doc = ref?.doc_id ? resolveKnowledgeBaseName(ref.doc_id, knowledgeBases.value) : "未知文档";
-        return `<strong>${index + 1}. ${doc}</strong> · ${item.text}`;
-      })
-      .join("<br>");
+    const rendered = `${resp.answer}`;
     appendMessage("system", rendered, "knowledge");
   } catch (error) {
     chatError.value = (error as Error).message;
@@ -874,9 +918,15 @@ async function handleGenerateFromText(content: string) {
   generationSource.value = "text";
   generationError.value = "";
   statusMessage.value = "";
+  if (!selectedKnowledgeBase.value) {
+    generationError.value = "请先选择知识库再生成课程。";
+    isGenerating.value = false;
+    generationSource.value = null;
+    return;
+  }
   try {
-  const payload: { text: string; doc_ids?: string[]; locale?: string } = { text: content, locale: "zh-CN" };
-    if (attachedDocIds.value.length) payload.doc_ids = attachedDocIds.value;
+    const payload: { text: string; base_id?: string | number; locale?: string } = { text: content, locale: "zh-CN" };
+    payload.base_id = selectedKnowledgeBase.value;
     const ticket = await createPrestudyFromText(payload);
     jobTicket.value = ticket;
     job.value = null;
@@ -899,8 +949,14 @@ async function handleGenerateFromPpt(file: File) {
   generationSource.value = "ppt";
   generationError.value = "";
   statusMessage.value = "";
+  if (!selectedKnowledgeBase.value) {
+    generationError.value = "请先选择知识库再生成课程。";
+    isGenerating.value = false;
+    generationSource.value = null;
+    return;
+  }
   try {
-    const ticket = await createPrestudyFromPpt(file, attachedDocIds.value.length ? attachedDocIds.value : undefined, "zh-CN");
+    const ticket = await createPrestudyFromPpt(file, selectedKnowledgeBase.value, "zh-CN");
     jobTicket.value = ticket;
     job.value = null;
     persistJobSnapshot(null);
@@ -1282,6 +1338,36 @@ function formatEventTime(value: string): string {
   }
 }
 
+function eventCardStyle(index: number) {
+  const palette = [
+    ["#0f172a", "#0ea5e9"],
+    ["#111827", "#22c55e"],
+    ["#312e81", "#a855f7"],
+    ["#1f2937", "#f97316"],
+  ];
+  const [from, to] = palette[index % palette.length];
+  return {
+    background: `linear-gradient(135deg, ${from} 0%, ${to} 100%)`,
+  };
+}
+
+function onEventDragStart(index: number) {
+  draggingEventIndex.value = index;
+}
+
+function onEventDrop(targetIndex: number) {
+  if (draggingEventIndex.value === null || draggingEventIndex.value === targetIndex) return;
+  const items = [...timelineEvents.value];
+  const [moved] = items.splice(draggingEventIndex.value, 1);
+  items.splice(targetIndex, 0, moved);
+  timelineEvents.value = items;
+  draggingEventIndex.value = null;
+}
+
+function onEventDragEnd() {
+  draggingEventIndex.value = null;
+}
+
 function difficultyLabel(level?: string) {
   const labels: Record<string, string> = {
     easy: "简单",
@@ -1373,28 +1459,33 @@ function restoreKnowledgeState() {
       }
     }
     const storedSelected = window.sessionStorage.getItem(KNOWLEDGE_BASE_SELECTION_KEY);
-    if (storedSelected && knowledgeBases.value.some((base) => base.id === storedSelected)) {
+    if (storedSelected && knowledgeBases.value.some((base) => String(base.id) === storedSelected)) {
       selectedKnowledgeBase.value = storedSelected;
+    } else {
+      selectedKnowledgeBase.value = firstAvailableBaseId(knowledgeBases.value);
     }
   } catch {
     window.sessionStorage.removeItem(KNOWLEDGE_BASE_STORAGE_KEY);
     window.sessionStorage.removeItem(KNOWLEDGE_BASE_SELECTION_KEY);
-    knowledgeBases.value = [DEFAULT_KNOWLEDGE_BASE];
-    selectedKnowledgeBase.value = DEFAULT_KNOWLEDGE_BASE.id;
+    knowledgeBases.value = [];
+    selectedKnowledgeBase.value = "";
   }
 }
 
 async function syncKnowledgeBases() {
   knowledgeSyncing.value = true;
   try {
-    const resp = await listKnowledgeDocuments();
-    const docs = (resp.documents ?? []).map(mapDocumentToKnowledgeBase);
-    const normalized = normalizeKnowledgeBaseList(docs);
-    knowledgeBases.value = normalized.length ? normalized : [DEFAULT_KNOWLEDGE_BASE];
-    if (!knowledgeBases.value.some((base) => base.id === selectedKnowledgeBase.value)) {
-      selectedKnowledgeBase.value = knowledgeBases.value[0]?.id ?? DEFAULT_KNOWLEDGE_BASE.id;
+    const resp = await listKnowledgeBases();
+    const bases = (resp.bases ?? []).map(mapBaseToItem);
+    const normalized = normalizeKnowledgeBaseList(bases);
+    knowledgeBases.value = normalized;
+    const fallback = firstAvailableBaseId(normalized);
+    if (!selectedKnowledgeBase.value && fallback) {
+      selectedKnowledgeBase.value = fallback;
+    } else if (!knowledgeBases.value.some((base) => String(base.id) === String(selectedKnowledgeBase.value))) {
+      selectedKnowledgeBase.value = fallback;
     }
-    knowledgeStatus.value = `已同步 ${Math.max(knowledgeBases.value.length - 1, 0)} 个文档`;
+    knowledgeStatus.value = knowledgeBases.value.length ? `已同步 ${knowledgeBases.value.length} 个知识库` : "尚未创建知识库";
   } catch (error) {
     knowledgeStatus.value = (error as Error).message;
   } finally {

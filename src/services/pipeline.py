@@ -19,12 +19,24 @@ from .ppt import extract_text
 logger = logging.getLogger(__name__)
 
 
-def _collect_rag_context(text: str, *, top_k: int = 5, doc_ids: Optional[List[str]] = None) -> List[Dict[str, Any]]:
+def _collect_rag_context(
+    *,
+    job: PrestudyJob,
+    text: str,
+    top_k: int = 5,
+) -> List[Dict[str, Any]]:
     if not settings.AGENT_SETTINGS.get("rag_enabled", True):
         return []
 
+    if not job.knowledge_base_id or not job.user_id:
+        return []
+
     try:
-        return retrieve.retrieve_context(query=text, top_k=top_k, doc_ids=doc_ids)
+        return retrieve.retrieve_context(
+            query=text,
+            top_k=top_k,
+            base=job.knowledge_base,
+        )
     except NotImplementedError:
         logger.debug("RAG retrieval not implemented yet; continuing without context.")
         return []
@@ -38,7 +50,6 @@ def run_pipeline(
     job: PrestudyJob,
     text: Optional[str] = None,
     ppt_file: Any | None = None,
-    doc_ids: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """Execute planner -> rewriter -> tutor pipeline for a prestudy job."""
     if text is None and ppt_file is None:
@@ -59,7 +70,7 @@ def run_pipeline(
 
     agent_settings = settings.AGENT_SETTINGS
     client = build_client(agent_settings)
-    rag_chunks = _collect_rag_context(extracted_text, top_k=5, doc_ids=doc_ids)
+    rag_chunks = _collect_rag_context(job=job, text=extracted_text, top_k=5)
 
     start = perf_counter()
     pipeline_result = runtime.orchestrate_pipeline(
@@ -132,6 +143,7 @@ def _ensure_lesson_plan(job: PrestudyJob) -> Dict[str, Any] | None:
     plan, _created = LessonPlan.objects.update_or_create(
         job=job,
         defaults={
+            "user": job.user,
             "title": title,
             "structure": structure,
             "notes": final_payload.get("summary", ""),

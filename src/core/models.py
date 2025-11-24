@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
@@ -18,6 +19,20 @@ class PrestudyJob(TimestampedModel):
         ("ppt", "PowerPoint"),
     ]
 
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="prestudy_jobs",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+    knowledge_base = models.ForeignKey(
+        "KnowledgeBase",
+        related_name="prestudy_jobs",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
     source_type = models.CharField(max_length=16, choices=SOURCE_CHOICES)
     source_excerpt = models.TextField(blank=True)
     planner_json = models.JSONField(default=dict, blank=True)
@@ -25,7 +40,6 @@ class PrestudyJob(TimestampedModel):
     status = models.CharField(max_length=32, default="pending")
     duration_ms = models.PositiveIntegerField(default=0)
     model_trace = models.JSONField(default=dict, blank=True)
-    knowledge_doc_ids = models.JSONField(default=list, blank=True)
 
     def __str__(self) -> str:
         return f"PrestudyJob#{self.pk}"
@@ -70,14 +84,42 @@ class LlmCallLog(TimestampedModel):
         return f"LlmCallLog#{self.pk}:{self.step}"
 
 
+class KnowledgeBase(TimestampedModel):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="knowledge_bases",
+        on_delete=models.CASCADE,
+    )
+    name = models.CharField(max_length=128)
+    description = models.TextField(blank=True)
+
+    class Meta:
+        unique_together = ("user", "name")
+        ordering = ("-updated_at",)
+
+    def __str__(self) -> str:
+        return f"{self.user}:{self.name}"
+
+
 class KnowledgeDocument(TimestampedModel):
-    doc_id = models.CharField(max_length=64, unique=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="knowledge_documents",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
+    base = models.ForeignKey("KnowledgeBase", related_name="documents", on_delete=models.CASCADE, null=True, blank=True)
+    doc_id = models.CharField(max_length=64)
     title = models.CharField(max_length=255)
     source_path = models.CharField(max_length=512, blank=True)
     metadata = models.JSONField(default=dict, blank=True)
 
     def __str__(self) -> str:
         return self.title
+
+    class Meta:
+        unique_together = ("base", "doc_id")
 
 
 class KnowledgeChunk(TimestampedModel):
@@ -95,9 +137,16 @@ class KnowledgeChunk(TimestampedModel):
 
 
 class LessonPlan(TimestampedModel):
-    """结构化教学计划，供课堂助教与推荐系统复用。"""
+    """Structured lesson plan used by timeline and recommendation."""
 
     job = models.OneToOneField(PrestudyJob, related_name="lesson_plan", on_delete=models.CASCADE)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name="lesson_plans",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+    )
     title = models.CharField(max_length=255)
     structure = models.JSONField(default=dict, blank=True)
     notes = models.TextField(blank=True)
@@ -107,7 +156,7 @@ class LessonPlan(TimestampedModel):
 
 
 class LessonEvent(TimestampedModel):
-    """课堂事件流水，如提问、投票、练习提交。"""
+    """Timeline events such as polls, submissions, or status updates."""
 
     plan = models.ForeignKey(LessonPlan, related_name="events", on_delete=models.CASCADE)
     event_type = models.CharField(max_length=64)
@@ -123,7 +172,7 @@ class LessonEvent(TimestampedModel):
 
 
 class RecommendationTask(TimestampedModel):
-    """记录基于学习行为生成的个性化推荐任务。"""
+    """记录基于学习行为生成的个性化推荐结果。"""
 
     STATUS_CHOICES = [
         ("pending", "Pending"),

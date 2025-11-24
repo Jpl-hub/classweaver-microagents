@@ -15,11 +15,9 @@ DEBUG = os.getenv("DEBUG", "false").lower() in {"1", "true", "yes"}
 ALLOWED_HOSTS = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")]
 
 INSTALLED_APPS = [
-    "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
-    "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
     "corsheaders",
@@ -34,7 +32,6 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
@@ -53,7 +50,6 @@ TEMPLATES: List[Dict[str, Any]] = [
                 "django.template.context_processors.debug",
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
-                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
@@ -67,10 +63,25 @@ if DATABASE_URL:
         "default": dj_database_url.parse(DATABASE_URL, conn_max_age=600, conn_health_checks=True),
     }
 else:
+    MYSQL_NAME = os.getenv("MYSQL_DATABASE", "classweaver")
+    MYSQL_USER = os.getenv("MYSQL_USER", "root")
+    MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "")
+    MYSQL_HOST = os.getenv("MYSQL_HOST", "127.0.0.1")
+    MYSQL_PORT = os.getenv("MYSQL_PORT", "3306")
+    MYSQL_CHARSET = os.getenv("MYSQL_CHARSET", "utf8mb4")
+
     DATABASES = {
         "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
+            "ENGINE": "django.db.backends.mysql",
+            "NAME": MYSQL_NAME,
+            "USER": MYSQL_USER,
+            "PASSWORD": MYSQL_PASSWORD,
+            "HOST": MYSQL_HOST,
+            "PORT": MYSQL_PORT,
+            "OPTIONS": {
+                "charset": MYSQL_CHARSET,
+                "init_command": f"SET SESSION sql_mode='STRICT_ALL_TABLES', NAMES {MYSQL_CHARSET}",
+            },
         }
     }
 
@@ -105,6 +116,11 @@ REST_FRAMEWORK = {
         "rest_framework.parsers.FormParser",
         "rest_framework.parsers.MultiPartParser",
     ],
+    # 默认用 Session 认证，前端需携带 CSRF；已提供 /api/auth/csrf/ 获取 token
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.SessionAuthentication",
+        "rest_framework.authentication.BasicAuthentication",
+    ],
 }
 
 SPECTACULAR_SETTINGS = {
@@ -119,8 +135,22 @@ if not CORS_ALLOW_ALL_ORIGINS:
     frontend_origin = os.getenv("FRONTEND_ORIGIN", "http://127.0.0.1:5173")
     CORS_ALLOWED_ORIGINS = [frontend_origin]
 
+# CSRF trusted origins（用于本地前端调试）
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CSRF_TRUSTED_ORIGINS", "http://127.0.0.1:5173,http://localhost:5173").split(",")
+    if origin.strip()
+]
+
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+
+# Session/CSRF cookie settings
+# 默认使用 Lax 以避免 Chrome 拒绝 SameSite=None 但非 HTTPS 的 Cookie；如需跨站（反向代理/HTTPS），请同时设置 *_SECURE=true 和 *_SAMESITE=None
+SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "false").lower() in {"1", "true", "yes"}
+CSRF_COOKIE_SECURE = os.getenv("CSRF_COOKIE_SECURE", "false").lower() in {"1", "true", "yes"}
+SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "Lax")
+CSRF_COOKIE_SAMESITE = os.getenv("CSRF_COOKIE_SAMESITE", SESSION_COOKIE_SAMESITE)
 
 # Agent configuration environment defaults for use in services
 AGENT_SETTINGS: Dict[str, Any] = {

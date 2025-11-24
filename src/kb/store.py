@@ -137,3 +137,16 @@ def upsert_embeddings(*, embeddings: List[List[float]], metadata: List[Dict[str,
 def clear_store_cache() -> None:
     """Clear cached vector-store instances (used by management commands/tests)."""
     _STORE_CACHE.clear()
+
+
+def clear_store_files() -> None:
+    """Delete on-disk FAISS index and metadata for a clean rebuild."""
+    try:
+        store = _STORE_CACHE.get(f"faiss::{Path(settings.AGENT_SETTINGS['vstore_path'])}")
+        if store:
+            if Path(store.index_path).exists():
+                Path(store.index_path).unlink()
+            if Path(store.meta_path).exists():
+                Path(store.meta_path).unlink()
+    finally:
+        clear_store_cache()
