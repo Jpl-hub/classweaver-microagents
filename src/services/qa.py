@@ -10,9 +10,15 @@ from src.services.citations import build_citations, ensure_answer_citations
 
 
 def answer_question(*, question: str, base, top_k: int = 4) -> Dict[str, Any]:
-    contexts = kb_retrieve.retrieve_context(query=question, top_k=top_k, base=base)
+    retrieval_payload = kb_retrieve.retrieve_context_with_diagnostics(query=question, top_k=top_k, base=base)
+    contexts = retrieval_payload["results"]
     if not contexts:
-        return {"answer": "知识库中没有找到相关内容。", "contexts": [], "citations": []}
+        return {
+            "answer": "知识库中没有找到相关内容。",
+            "contexts": [],
+            "citations": [],
+            "retrieval_diagnostics": retrieval_payload.get("diagnostics", {}),
+        }
 
     client = build_client(settings.AGENT_SETTINGS)
     context_text = "\n\n".join(
@@ -38,4 +44,5 @@ def answer_question(*, question: str, base, top_k: int = 4) -> Dict[str, Any]:
         "answer": ensure_answer_citations(answer, citations),
         "contexts": contexts,
         "citations": citations,
+        "retrieval_diagnostics": retrieval_payload.get("diagnostics", {}),
     }

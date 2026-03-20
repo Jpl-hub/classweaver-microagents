@@ -55,8 +55,10 @@ def test_retrieve_context_delegates_filtering_to_store(monkeypatch):
     monkeypatch.setitem(retrieve.settings.AGENT_SETTINGS, "hybrid_retrieval", False)
 
     result = retrieve.retrieve_context(query="question", top_k=5, base=base)
+    payload = retrieve.retrieve_context_with_diagnostics(query="question", top_k=5, base=base)
 
     assert result[0]["refs"][0]["doc_id"] == "doc-1"
+    assert payload["diagnostics"]["vector_hits"] == 1
     assert captured["count"]["base_id"] == base.pk
     assert captured["search"]["base_id"] == base.pk
     assert captured["search"]["doc_ids"] == ["doc-1"]
@@ -88,8 +90,11 @@ def test_retrieve_context_fuses_hybrid_results(monkeypatch):
     monkeypatch.setattr(retrieve, "get_store", lambda backend: FakeStore())
     monkeypatch.setitem(retrieve.settings.AGENT_SETTINGS, "hybrid_retrieval", True)
 
-    result = retrieve.retrieve_context(query="question", top_k=5, base=base)
+    payload = retrieve.retrieve_context_with_diagnostics(query="question", top_k=5, base=base)
+    result = payload["results"]
 
     assert len(result) == 2
     fused_sources = sorted(result[0]["metadata"]["retrieval_sources"] + result[1]["metadata"]["retrieval_sources"])
     assert fused_sources == ["lexical", "vector"]
+    assert payload["diagnostics"]["hybrid_enabled"] is True
+    assert payload["diagnostics"]["lexical_hits"] == 1

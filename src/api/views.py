@@ -241,6 +241,7 @@ class PrestudyDetailView(APIView):
             "task_id": job.task_id,
             "attempts": job.attempts,
             "error_message": job.error_message,
+            "retrieval_diagnostics": (job.final_json or {}).get("retrieval_diagnostics") or {},
         }
         printable_payload = printable_service.build_printable_payload(base_payload["final_json"])
         base_payload["printable"] = printable_payload

@@ -16,8 +16,20 @@ export interface ModelTraceSegment {
   latency_ms: number;
   input_chars: number;
   output_chars: number;
-  rag?: Record<string, unknown>;
+  rag?: RetrievalDiagnostics & Record<string, unknown>;
   fallback?: boolean;
+}
+
+export interface RetrievalDiagnostics {
+  enabled?: boolean;
+  backend?: string;
+  hybrid_enabled?: boolean;
+  total_entries?: number;
+  search_k?: number;
+  vector_hits?: number;
+  lexical_hits?: number;
+  final_hits?: number;
+  source_counts?: Record<string, number>;
 }
 
 export interface KnowledgePoint {
@@ -73,6 +85,7 @@ export interface PrestudyResponse {
   duration_ms: number;
   printable?: PrintablePayload;
   lesson_plan?: LessonPlanSummary;
+  retrieval_diagnostics?: RetrievalDiagnostics;
 }
 
 export interface PrestudyJobTicket {
@@ -140,6 +153,7 @@ export interface KnowledgeQaResponse {
   answer: string;
   contexts: KnowledgeSearchResult[];
   citations?: CitationItem[];
+  retrieval_diagnostics?: RetrievalDiagnostics;
 }
 
 export interface KnowledgeBase {

@@ -16,6 +16,7 @@ def orchestrate_pipeline(
     tutor_module,
     text: str,
     rag_chunks: List[Dict[str, Any]],
+    rag_diagnostics: Dict[str, Any],
     settings: Dict[str, Any],
 ) -> Dict[str, Any]:
     """Coordinate planner -> rewriter -> tutor agents."""
@@ -39,7 +40,7 @@ def orchestrate_pipeline(
                 "latency_ms": planner_latency,
                 "input_chars": len(text),
                 "output_chars": len(str(planner_payload)),
-                "rag": {"enabled": bool(rag_chunks), "backend": settings.get("vector_backend")},
+                "rag": {"enabled": bool(rag_chunks), "backend": settings.get("vector_backend"), **(rag_diagnostics or {})},
                 "fallback": False,
             }
         )
@@ -65,7 +66,7 @@ def orchestrate_pipeline(
                 "latency_ms": rewriter_latency,
                 "input_chars": len(str(planner_payload)),
                 "output_chars": len(str(final_payload)),
-                "rag": {"enabled": bool(rag_chunks), "backend": settings.get("vector_backend")},
+                "rag": {"enabled": bool(rag_chunks), "backend": settings.get("vector_backend"), **(rag_diagnostics or {})},
                 "fallback": bool(rewriter_error),
                 "error": rewriter_error,
             }
@@ -101,7 +102,7 @@ def orchestrate_pipeline(
                 "latency_ms": tutor_latency,
                 "input_chars": len(str(final_payload)),
                 "output_chars": len(str(tutor_payload)),
-                "rag": {"enabled": bool(rag_chunks), "backend": settings.get("vector_backend")},
+                "rag": {"enabled": bool(rag_chunks), "backend": settings.get("vector_backend"), **(rag_diagnostics or {})},
                 "fallback": bool(tutor_error),
                 "error": tutor_error,
             }

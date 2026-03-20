@@ -25,25 +25,27 @@ def _collect_rag_context(
     job: PrestudyJob,
     text: str,
     top_k: int = 5,
-) -> List[Dict[str, Any]]:
+) -> Dict[str, Any]:
     if not settings.AGENT_SETTINGS.get("rag_enabled", True):
-        return []
+        return {"results": [], "diagnostics": {"enabled": False}}
 
     if not job.knowledge_base_id or not job.user_id:
-        return []
+        return {"results": [], "diagnostics": {"enabled": False}}
 
     try:
-        return retrieve.retrieve_context(
+        payload = retrieve.retrieve_context_with_diagnostics(
             query=text,
             top_k=top_k,
             base=job.knowledge_base,
         )
+        payload["diagnostics"]["enabled"] = True
+        return payload
     except NotImplementedError:
         logger.debug("RAG retrieval not implemented yet; continuing without context.")
-        return []
+        return {"results": [], "diagnostics": {"enabled": False, "error": "not_implemented"}}
     except Exception:  # noqa: BLE001
         logger.exception("Failed to retrieve RAG context; proceeding without it.")
-        return []
+        return {"results": [], "diagnostics": {"enabled": False, "error": "retrieval_failed"}}
 
 
 def run_pipeline(
@@ -71,7 +73,9 @@ def run_pipeline(
 
     agent_settings = settings.AGENT_SETTINGS
     client = build_client(agent_settings)
-    rag_chunks = _collect_rag_context(job=job, text=extracted_text, top_k=5)
+    rag_payload = _collect_rag_context(job=job, text=extracted_text, top_k=5)
+    rag_chunks = rag_payload.get("results", [])
+    rag_diagnostics = rag_payload.get("diagnostics", {})
 
     start = perf_counter()
     pipeline_result = runtime.orchestrate_pipeline(
@@ -82,6 +86,7 @@ def run_pipeline(
         text=extracted_text,
         rag_chunks=rag_chunks,
         settings=agent_settings,
+        rag_diagnostics=rag_diagnostics,
     )
     duration_ms = int((perf_counter() - start) * 1000)
     source_citations = build_citations(rag_chunks, limit=5)
@@ -91,6 +96,9 @@ def run_pipeline(
     if source_citations:
         planner_payload["sources"] = source_citations
         final_payload["sources"] = source_citations
+    if rag_diagnostics:
+        planner_payload["retrieval_diagnostics"] = rag_diagnostics
+        final_payload["retrieval_diagnostics"] = rag_diagnostics
 
     job.planner_json = planner_payload
     job.final_json = final_payload

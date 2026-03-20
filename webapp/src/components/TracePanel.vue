@@ -19,6 +19,12 @@
         </div>
         <div v-if="item.rag?.enabled" class="text-xs text-emerald-600">
           RAG 后端：{{ (item.rag.backend as string) || "未设置" }}
+          <span v-if="item.rag.hybrid_enabled"> · hybrid</span>
+          <span v-if="typeof item.rag.total_entries === 'number'"> · corpus {{ item.rag.total_entries }}</span>
+          <span v-if="typeof item.rag.search_k === 'number'"> · search_k {{ item.rag.search_k }}</span>
+        </div>
+        <div v-if="item.rag?.enabled && (item.rag.vector_hits || item.rag.lexical_hits || item.rag.final_hits)" class="text-xs text-slate-500">
+          vector {{ item.rag.vector_hits ?? 0 }} · lexical {{ item.rag.lexical_hits ?? 0 }} · final {{ item.rag.final_hits ?? 0 }}
         </div>
         <div v-if="item.fallback" class="text-xs font-semibold text-amber-600">已触发降级</div>
       </li>
