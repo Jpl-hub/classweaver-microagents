@@ -54,11 +54,15 @@
         </div>
       </div>
     </article>
+    <RetrievalDiagnosticsCard v-if="jobDetail" :diagnostics="jobDiagnostics" />
+    <TracePanel v-if="jobDetail" :items="jobTrace" />
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
+import RetrievalDiagnosticsCard from "../components/RetrievalDiagnosticsCard.vue";
+import TracePanel from "../components/TracePanel.vue";
 import type { PrestudyJobTicket, PrestudyResponse } from "../types";
 import { formatRelativeTime } from "../utils/knowledge";
 
@@ -94,6 +98,25 @@ const snapshot = computed(() => {
     return null;
   }
 });
+
+const jobDetail = computed(() => {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const payload = JSON.parse(raw) as { result?: PrestudyResponse | null };
+    return payload.result ?? null;
+  } catch {
+    return null;
+  }
+});
+
+const jobTrace = computed(() => (Array.isArray(jobDetail.value?.model_trace) ? jobDetail.value.model_trace : []));
+const jobDiagnostics = computed(
+  () =>
+    jobDetail.value?.retrieval_diagnostics ??
+    ((jobDetail.value?.final_json?.retrieval_diagnostics as Record<string, unknown> | null | undefined) ?? null),
+);
 
 const conversation = computed<ChatMessage[]>(() => {
   if (typeof window === "undefined") return [];

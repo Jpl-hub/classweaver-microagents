@@ -379,6 +379,8 @@
             <p class="mt-2 text-sm text-emerald-700">{{ encouragement.sub }}</p>
           </div>
         </article>
+        <RetrievalDiagnosticsCard v-if="job" :diagnostics="retrievalDiagnostics" />
+        <TracePanel v-if="job" :items="modelTraceItems" />
       </div>
     </section>
 
@@ -488,6 +490,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
+import RetrievalDiagnosticsCard from "../components/RetrievalDiagnosticsCard.vue";
+import TracePanel from "../components/TracePanel.vue";
 import {
   createPrestudyFromPpt,
   createPrestudyFromText,
@@ -639,6 +643,12 @@ const practiceCount = computed(() => {
   return practice.length;
 });
 const knowledgeModalPoints = computed(() => toArray(job.value?.final_json?.knowledge_points));
+const modelTraceItems = computed(() => (Array.isArray(job.value?.model_trace) ? job.value.model_trace : []));
+const retrievalDiagnostics = computed(
+  () =>
+    job.value?.retrieval_diagnostics ??
+    ((job.value?.final_json?.retrieval_diagnostics as Record<string, unknown> | null | undefined) ?? null),
+);
 
 const attachedDocIds = computed(() => {
   if (selectedKnowledgeBase.value && selectedKnowledgeBase.value !== DEFAULT_KNOWLEDGE_BASE.id) {
