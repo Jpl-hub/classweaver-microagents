@@ -379,6 +379,11 @@
             <p class="mt-2 text-sm text-emerald-700">{{ encouragement.sub }}</p>
           </div>
         </article>
+        <BenchmarkSnapshotCard
+          v-if="job"
+          :current-overall="evaluationOverallScore"
+          :current-verdict="evaluationInsights?.verdict ?? null"
+        />
         <RetrievalDiagnosticsCard v-if="job" :diagnostics="retrievalDiagnostics" />
         <EvaluationInsightsCard
           v-if="job"
@@ -496,6 +501,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
+import BenchmarkSnapshotCard from "../components/BenchmarkSnapshotCard.vue";
 import EvaluationInsightsCard from "../components/EvaluationInsightsCard.vue";
 import RetrievalDiagnosticsCard from "../components/RetrievalDiagnosticsCard.vue";
 import TracePanel from "../components/TracePanel.vue";
@@ -654,6 +660,10 @@ const modelTraceItems = computed(() => (Array.isArray(job.value?.model_trace) ? 
 const evaluationInsights = computed(
   () => ((job.value?.final_json?.evaluation as Record<string, unknown> | null | undefined) ?? null),
 );
+const evaluationOverallScore = computed(() => {
+  const value = evaluationInsights.value?.scores?.overall;
+  return typeof value === "number" ? value : null;
+});
 const reflectionInsights = computed(
   () => ((job.value?.final_json?.reflection as Record<string, unknown> | null | undefined) ?? null),
 );

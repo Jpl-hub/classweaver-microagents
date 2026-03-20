@@ -54,6 +54,11 @@
         </div>
       </div>
     </article>
+    <BenchmarkSnapshotCard
+      v-if="jobDetail"
+      :current-overall="jobOverallScore"
+      :current-verdict="jobEvaluation?.verdict ?? null"
+    />
     <RetrievalDiagnosticsCard v-if="jobDetail" :diagnostics="jobDiagnostics" />
     <EvaluationInsightsCard
       v-if="jobDetail"
@@ -67,6 +72,7 @@
 
 <script setup lang="ts">
 import { computed } from "vue";
+import BenchmarkSnapshotCard from "../components/BenchmarkSnapshotCard.vue";
 import EvaluationInsightsCard from "../components/EvaluationInsightsCard.vue";
 import RetrievalDiagnosticsCard from "../components/RetrievalDiagnosticsCard.vue";
 import TracePanel from "../components/TracePanel.vue";
@@ -128,6 +134,10 @@ const jobReflection = computed(
 const jobReviewSummary = computed(
   () => ((jobDetail.value?.final_json?.review_summary as Record<string, unknown> | null | undefined) ?? null),
 );
+const jobOverallScore = computed(() => {
+  const value = jobEvaluation.value?.scores?.overall;
+  return typeof value === "number" ? value : null;
+});
 const jobDiagnostics = computed(
   () =>
     jobDetail.value?.retrieval_diagnostics ??
