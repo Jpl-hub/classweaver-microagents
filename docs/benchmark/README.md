@@ -25,12 +25,21 @@
 python manage.py evaluate_retrieval --base-id 1 --dataset docs/benchmark/retrieval_eval.sample.json --top-k 5
 ```
 
+```bash
+python manage.py evaluate_qa_citations --base-id 1 --dataset docs/benchmark/qa_citation_eval.sample.json --top-k 4
+```
+
 ## 当前指标
 
 - `hit_rate`: top-k 中是否至少命中一个标准引用
 - `mrr`: 第一个正确引用的倒数排名
 - `avg_recall_at_k`: top-k 对标准引用集合的平均召回率
 - `avg_precision_at_k`: top-k 返回引用中正确引用的平均占比
+- `citation_hit_rate`: QA 返回的 citations 是否命中标准引用
+- `citation_marker_rate`: 回答文本是否显式使用 `[1]` 这类 citation 标记
+- `avg_valid_marker_rate`: 回答中 citation 标记是否落在有效引用范围内
+- `avg_citation_recall`: QA 返回 citations 对标准引用集合的平均召回率
+- `avg_citation_precision`: QA 返回 citations 中正确引用的平均占比
 
 ## 建议使用方式
 

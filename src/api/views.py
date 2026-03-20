@@ -23,9 +23,9 @@ from src.kb import retrieve as kb_retrieve
 from src.services import printable as printable_service
 from src.services import ppt as ppt_service
 from src.services.jobs import enqueue_prestudy_job
+from src.services.qa import answer_question
 from src.services import recommendation as recommendation_service
 from src.services.scoring import score_quiz
-from src.services.citations import build_citations, ensure_answer_citations
 from src.agents.utils import build_client
 
 from .serializers import (
@@ -429,37 +429,11 @@ class KnowledgeQaView(APIView):
         top_k = serializer.validated_data["top_k"]
 
         try:
-            contexts = kb_retrieve.retrieve_context(query=question, top_k=top_k, base=base)
+            payload = answer_question(question=question, base=base, top_k=top_k)
         except Exception as exc:  # noqa: BLE001
-            logger.exception("Knowledge QA search failed")
+            logger.exception("Knowledge QA failed")
             return Response({"detail": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        if not contexts:
-            return Response({"answer": "知识库中没有找到相关内容。", "contexts": []})
-
-        client = build_client(settings.AGENT_SETTINGS)
-        context_text = "\n\n".join(
-            f"[{idx + 1}] {ctx.get('text', '')}" for idx, ctx in enumerate(contexts)
-        )
-        system_prompt = (
-            "你是一个知识库问答助手。根据提供的上下文用中文简洁回答，"
-            "如果上下文不足，直接说明无法找到答案，不要编造。"
-        )
-        user_prompt = f"问题：{question}\n\n可用上下文：\n{context_text}"
-
-        try:
-            answer = client.chat(
-                model=settings.AGENT_SETTINGS.get("qwen_model", "Qwen/Qwen2.5-14B-Instruct"),
-                system=system_prompt,
-                user=user_prompt + "\n\n请在回答中使用 [1] [2] 这类引用标记引用可用上下文，不要编造来源。",
-                temperature=0.2,
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("Knowledge QA generation failed")
-            return Response({"detail": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        citations = build_citations(contexts, limit=top_k)
-        return Response({"answer": ensure_answer_citations(answer, citations), "contexts": contexts, "citations": citations})
+        return Response(payload)
 
 
 class KnowledgeDocumentListView(APIView):

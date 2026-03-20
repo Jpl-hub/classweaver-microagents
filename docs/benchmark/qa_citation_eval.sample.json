@@ -1,0 +1,22 @@
+{
+  "cases": [
+    {
+      "query": "卷积层在卷积神经网络中负责什么？",
+      "expected_refs": [
+        {
+          "doc_id": "replace-with-doc-id",
+          "chunk_id": "replace-with-chunk-id"
+        }
+      ]
+    },
+    {
+      "query": "反向传播和梯度下降之间是什么关系？",
+      "expected_refs": [
+        {
+          "doc_id": "replace-with-doc-id",
+          "chunk_id": "replace-with-chunk-id"
+        }
+      ]
+    }
+  ]
+}
