@@ -14,6 +14,7 @@ from src.core.models import LessonEvent, LessonPlan, LlmCallLog, PrestudyJob
 from src.kb import retrieve
 
 from . import printable
+from .citations import build_citations
 from .ppt import extract_text
 
 logger = logging.getLogger(__name__)
@@ -83,9 +84,16 @@ def run_pipeline(
         settings=agent_settings,
     )
     duration_ms = int((perf_counter() - start) * 1000)
+    source_citations = build_citations(rag_chunks, limit=5)
 
-    job.planner_json = pipeline_result.get("planner_json", {})
-    job.final_json = pipeline_result.get("final_json", {})
+    planner_payload = pipeline_result.get("planner_json", {}) or {}
+    final_payload = pipeline_result.get("final_json", {}) or {}
+    if source_citations:
+        planner_payload["sources"] = source_citations
+        final_payload["sources"] = source_citations
+
+    job.planner_json = planner_payload
+    job.final_json = final_payload
     job.model_trace = pipeline_result.get("model_trace", {})
     job.status = pipeline_result.get("status", "completed")
     job.duration_ms = duration_ms

@@ -15,6 +15,13 @@ class PlannerQuizOption(BaseModel):
     D: str
 
 
+class CitationRef(BaseModel):
+    doc_id: str = ""
+    chunk_id: str = ""
+    title: str = ""
+    text: str = ""
+
+
 class PlannerQuizItem(BaseModel):
     id: str
     question: str
@@ -23,7 +30,7 @@ class PlannerQuizItem(BaseModel):
     explain: str = Field(default="")
     difficulty: str = Field(default="medium")
     kp_ids: List[str] = Field(default_factory=list)
-    refs: List[Dict[str, Any]] = Field(default_factory=list)
+    refs: List[CitationRef] = Field(default_factory=list)
 
     @field_validator("options", mode="before")
     @classmethod
@@ -67,10 +74,22 @@ class PlannerQuiz(BaseModel):
     items: List[PlannerQuizItem]
 
 
+class PlannerKnowledgePoint(BaseModel):
+    id: str = ""
+    title: str
+    summary: str = ""
+    refs: List[CitationRef] = Field(default_factory=list)
+
+    @field_validator("refs", mode="before")
+    @classmethod
+    def normalize_refs(cls, value: Any) -> List[Dict[str, Any]]:
+        return PlannerQuizItem.normalize_refs(value)
+
+
 class PlannerResponse(BaseModel):
     title: str
     summary: str
-    knowledge_points: List[Dict[str, Any]]
+    knowledge_points: List[PlannerKnowledgePoint]
     glossary: List[Dict[str, Any]]
     quiz: PlannerQuiz
 

@@ -22,7 +22,7 @@ def test_planner_response_normalizes_string_refs():
 
     validated = PlannerResponse.model_validate(payload)
 
-    refs = validated.quiz.items[0].refs
+    refs = [item.model_dump(exclude_none=True, exclude={"title", "text"}) for item in validated.quiz.items[0].refs]
     assert refs == [{"doc_id": "123abc", "chunk_id": "123abc-0"}]
 
 
@@ -47,5 +47,5 @@ def test_planner_response_ignores_invalid_refs():
 
     validated = PlannerResponse.model_validate(payload)
 
-    refs = validated.quiz.items[0].refs
+    refs = [item.model_dump(exclude_none=True, exclude={"title", "text"}) for item in validated.quiz.items[0].refs]
     assert refs == [{"doc_id": "doc", "chunk_id": "doc-0"}]

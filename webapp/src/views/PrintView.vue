@@ -58,6 +58,12 @@
           >
             <h3 class="text-lg font-semibold text-slate-800">{{ kp.title || kp.id }}</h3>
             <p class="text-sm text-slate-600">{{ kp.summary }}</p>
+            <ul v-if="kp.refs?.length" class="mt-3 space-y-1 text-xs text-slate-500">
+              <li v-for="(ref, refIndex) in kp.refs" :key="`${kp.id || kp.title}-${ref.chunk_id || refIndex}`">
+                来源 {{ ref.label || `[${refIndex + 1}]` }}：
+                {{ ref.title || ref.doc_id || "未命名文档" }}
+              </li>
+            </ul>
           </li>
           <li v-if="!printable.knowledge_points.length" class="text-sm text-slate-500">
             暂无知识点。
@@ -111,8 +117,36 @@
             <p class="text-sm font-semibold text-slate-800">{{ index + 1 }}. {{ practice.prompt }}</p>
             <p v-if="practice.answer" class="mt-2 text-sm text-slate-600">参考答案：{{ practice.answer }}</p>
             <p v-if="practice.reasoning" class="text-sm italic text-slate-500">{{ practice.reasoning }}</p>
+            <ul v-if="practice.citations?.length" class="mt-3 space-y-1 text-xs text-slate-500">
+              <li
+                v-for="(citation, citationIndex) in practice.citations"
+                :key="`${index}-${citation.chunk_id || citationIndex}`"
+              >
+                来源 {{ citation.label || `[${citationIndex + 1}]` }}：
+                {{ citation.title || citation.doc_id || "未命名文档" }}
+              </li>
+            </ul>
           </li>
           <li v-if="!printable.practice.length" class="text-sm text-slate-500">暂无额外练习。</li>
+        </ol>
+      </section>
+
+      <section v-if="printable.sources?.length" class="rounded border border-slate-200 bg-white p-6 shadow-sm space-y-4">
+        <header class="flex items-center justify-between">
+          <h2 class="text-xl font-semibold text-slate-800">参考来源</h2>
+          <span class="text-sm text-slate-500">{{ printable.sources.length }} 条</span>
+        </header>
+        <ol class="space-y-3">
+          <li
+            v-for="(source, index) in printable.sources"
+            :key="source.chunk_id || `${source.doc_id}-${index}`"
+            class="rounded border border-slate-200 bg-slate-50 p-4"
+          >
+            <p class="text-sm font-semibold text-slate-800">
+              {{ source.label || `[${index + 1}]` }} {{ source.title || source.doc_id || "未命名文档" }}
+            </p>
+            <p class="mt-1 text-sm text-slate-600">{{ source.text }}</p>
+          </li>
         </ol>
       </section>
     </div>
@@ -203,6 +237,7 @@ function buildPrintableFromFinal(payload: PrestudyResponse): PrintablePayload | 
     glossary: toArray<PrintablePayload["glossary"][number]>(finalJson.glossary),
     quiz: toArray<PrintablePayload["quiz"][number]>(quizBlock.items),
     practice: toArray<PrintablePayload["practice"][number]>(tutorBlock?.practice),
+    sources: toArray<PrintablePayload["sources"][number]>(finalJson.sources),
   };
 }
 

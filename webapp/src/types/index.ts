@@ -24,6 +24,7 @@ export interface KnowledgePoint {
   id?: string;
   title?: string;
   summary?: string;
+  refs?: CitationItem[];
 }
 
 export interface GlossaryItem {
@@ -35,6 +36,16 @@ export interface PrintablePracticeItem {
   prompt: string;
   answer?: string;
   reasoning?: string;
+  citations?: CitationItem[];
+}
+
+export interface CitationItem {
+  doc_id?: string;
+  chunk_id?: string;
+  title?: string;
+  text?: string;
+  score?: number;
+  label?: string;
 }
 
 export interface PrintablePayload {
@@ -43,6 +54,7 @@ export interface PrintablePayload {
   glossary: GlossaryItem[];
   quiz: Array<QuizQuestion & { answer?: string; explain?: string }>;
   practice: PrintablePracticeItem[];
+  sources?: CitationItem[];
 }
 
 export interface LessonPlanSummary {
@@ -127,6 +139,7 @@ export interface RagSearchRequest {
 export interface KnowledgeQaResponse {
   answer: string;
   contexts: KnowledgeSearchResult[];
+  citations?: CitationItem[];
 }
 
 export interface KnowledgeBase {

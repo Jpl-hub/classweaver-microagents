@@ -25,6 +25,7 @@ from src.services import ppt as ppt_service
 from src.services.jobs import enqueue_prestudy_job
 from src.services import recommendation as recommendation_service
 from src.services.scoring import score_quiz
+from src.services.citations import build_citations
 from src.agents.utils import build_client
 
 from .serializers import (
@@ -450,14 +451,14 @@ class KnowledgeQaView(APIView):
             answer = client.chat(
                 model=settings.AGENT_SETTINGS.get("qwen_model", "Qwen/Qwen2.5-14B-Instruct"),
                 system=system_prompt,
-                user=user_prompt,
+                user=user_prompt + "\n\n请在回答中使用 [1] [2] 这类引用标记引用可用上下文，不要编造来源。",
                 temperature=0.2,
             )
         except Exception as exc:  # noqa: BLE001
             logger.exception("Knowledge QA generation failed")
             return Response({"detail": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        return Response({"answer": answer, "contexts": contexts})
+        return Response({"answer": answer, "contexts": contexts, "citations": build_citations(contexts, limit=top_k)})
 
 
 class KnowledgeDocumentListView(APIView):

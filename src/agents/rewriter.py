@@ -29,6 +29,7 @@ class RewriterQuizItem(BaseModel):
     explain: str = ""
     difficulty: str = "medium"
     kp_ids: List[str] = Field(default_factory=list)
+    refs: List[Dict[str, Any]] = Field(default_factory=list)
     variants: List[VariantItem] = Field(default_factory=list)
 
 
@@ -58,6 +59,7 @@ def rewrite_quiz(*, client, planner_payload: Dict[str, Any]) -> Dict[str, Any]:
                 "explain": item.get("explain", ""),
                 "difficulty": item.get("difficulty", "medium"),
                 "kp_ids": item.get("kp_ids", []),
+                "refs": item.get("refs", []),
             }
         )
 

@@ -8,6 +8,8 @@ def build_printable_payload(data: Dict[str, Any]) -> Dict[str, Any]:
     knowledge_points = data.get("knowledge_points", [])
     glossary = data.get("glossary", [])
     practice = data.get("practice", {}).get("items", [])
+    if not practice:
+        practice = data.get("tutor", {}).get("practice", [])
 
     return {
         "title": data.get("title", "ClassWeaver Printable Pack"),
@@ -15,4 +17,5 @@ def build_printable_payload(data: Dict[str, Any]) -> Dict[str, Any]:
         "glossary": glossary,
         "quiz": quiz_items,
         "practice": practice,
+        "sources": data.get("sources", []),
     }

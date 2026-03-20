@@ -47,6 +47,7 @@ Return JSON with this shape (no extra keys):
         "explain": str,
         "difficulty": "easy" | "medium" | "hard",
         "kp_ids": [str],
+        "refs": [],
         "variants": [
           {
             "question": str,
