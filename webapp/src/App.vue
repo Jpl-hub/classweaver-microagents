@@ -6,6 +6,7 @@
           <RouterLink to="/" class="text-lg font-semibold text-slate-900">ClassWeaver</RouterLink>
           <div class="flex flex-wrap items-center gap-4 text-sm text-slate-600">
             <RouterLink to="/" class="hover:text-blue-600">&#23398;&#20064;&#24037;&#20316;&#21488;</RouterLink>
+            <RouterLink to="/benchmarks" class="hover:text-blue-600">实验分析</RouterLink>
             <RouterLink to="/coach" class="hover:text-blue-600">&#25945;&#32451;&#36741;&#23548;</RouterLink>
             <RouterLink to="/take" class="hover:text-blue-600">&#27979;&#39564;&#32451;&#20064;</RouterLink>
             <RouterLink to="/print" class="hover:text-blue-600">&#25171;&#21360;&#28165;&#21333;</RouterLink>

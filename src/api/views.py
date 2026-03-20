@@ -1,6 +1,7 @@
 import json
 import logging
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone as dt_timezone
 from pathlib import Path
 import uuid
 from typing import Any, Dict, List
@@ -26,6 +27,7 @@ from src.services.jobs import enqueue_prestudy_job
 from src.services.qa import answer_question
 from src.services import recommendation as recommendation_service
 from src.services.scoring import score_quiz
+from src.services.evaluation import compare_report_summaries
 from src.agents.utils import build_client
 
 from .serializers import (
@@ -48,6 +50,7 @@ from .serializers import (
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
+REPORTS_DIR = settings.BASE_DIR.parent / "reports"
 
 
 class CsrfExemptSessionAuthentication(SessionAuthentication):
@@ -585,3 +588,77 @@ class RecommendationTriggerView(APIView):
             {"id": str(task.pk), "status": task.status, "output": task.output or {}}
         )
         return Response(response.data, status=status.HTTP_201_CREATED)
+
+
+class BenchmarkReportListView(APIView):
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        reports: List[Dict[str, Any]] = []
+        if REPORTS_DIR.exists():
+            for path in sorted(REPORTS_DIR.glob("*.json"), key=lambda item: item.stat().st_mtime, reverse=True):
+                try:
+                    payload = json.loads(path.read_text(encoding="utf-8"))
+                except json.JSONDecodeError:
+                    continue
+                reports.append(
+                    {
+                        "name": path.name,
+                        "size": path.stat().st_size,
+                        "updated_at": datetime.fromtimestamp(path.stat().st_mtime, tz=dt_timezone.utc).isoformat(),
+                        "meta": payload.get("meta") or {},
+                        "config": payload.get("config") or {},
+                        "summary": payload.get("summary") or {},
+                    }
+                )
+        return Response({"reports": reports})
+
+
+class BenchmarkReportDetailView(APIView):
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, name: str, *args, **kwargs):
+        report_path = (REPORTS_DIR / name).resolve()
+        if REPORTS_DIR.resolve() not in report_path.parents or report_path.suffix.lower() != ".json" or not report_path.exists():
+            return Response({"detail": "Report not found."}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            payload = json.loads(report_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as exc:
+            return Response({"detail": f"Invalid report JSON: {exc}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({"name": report_path.name, "report": payload})
+
+
+class BenchmarkReportCompareView(APIView):
+    authentication_classes = [SessionAuthentication]
+    permission_classes = [IsAuthenticated]
+    parser_classes = [JSONParser]
+
+    def post(self, request, *args, **kwargs):
+        baseline_name = str(request.data.get("baseline", "")).strip()
+        candidate_name = str(request.data.get("candidate", "")).strip()
+        if not baseline_name or not candidate_name:
+            return Response({"detail": "baseline and candidate are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        def load_report(name: str) -> Dict[str, Any]:
+            path = (REPORTS_DIR / name).resolve()
+            if REPORTS_DIR.resolve() not in path.parents or path.suffix.lower() != ".json" or not path.exists():
+                raise FileNotFoundError(name)
+            return json.loads(path.read_text(encoding="utf-8"))
+
+        try:
+            baseline = load_report(baseline_name)
+            candidate = load_report(candidate_name)
+        except FileNotFoundError as exc:
+            return Response({"detail": f"Report not found: {exc}"}, status=status.HTTP_404_NOT_FOUND)
+        except json.JSONDecodeError as exc:
+            return Response({"detail": f"Invalid report JSON: {exc}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        return Response(
+            {
+                "baseline": baseline_name,
+                "candidate": candidate_name,
+                "diff": compare_report_summaries(baseline=baseline, candidate=candidate),
+            }
+        )

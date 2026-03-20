@@ -25,4 +25,7 @@ urlpatterns = [
     path("lesson/<int:pk>/timeline/", views.LessonTimelineView.as_view(), name="lesson-timeline"),
     path("lesson/<int:pk>/events/", views.LessonEventCreateView.as_view(), name="lesson-event-create"),
     path("recommendations/", views.RecommendationTriggerView.as_view(), name="recommendations"),
+    path("benchmark/reports/", views.BenchmarkReportListView.as_view(), name="benchmark-report-list"),
+    path("benchmark/reports/compare/", views.BenchmarkReportCompareView.as_view(), name="benchmark-report-compare"),
+    path("benchmark/reports/<str:name>/", views.BenchmarkReportDetailView.as_view(), name="benchmark-report-detail"),
 ]

@@ -2,6 +2,9 @@ import type {
   KnowledgeDocumentListResponse,
   KnowledgeSearchResponse,
   KnowledgeBase,
+  BenchmarkReportCompareResponse,
+  BenchmarkReportDetailResponse,
+  BenchmarkReportListResponse,
   LessonTimelinePayload,
   PrestudyJobTicket,
   PrestudyResponse,
@@ -223,6 +226,21 @@ export function triggerRecommendations(jobId: string, sessionId?: string): Promi
   return request("/api/recommendations/", {
     method: "POST",
     body: JSON.stringify({ job_id: jobId, session_id: sessionId, locale: "zh-CN" }),
+  });
+}
+
+export function listBenchmarkReports(): Promise<BenchmarkReportListResponse> {
+  return request("/api/benchmark/reports/");
+}
+
+export function getBenchmarkReport(name: string): Promise<BenchmarkReportDetailResponse> {
+  return request(`/api/benchmark/reports/${encodeURIComponent(name)}/`);
+}
+
+export function compareBenchmarkReports(baseline: string, candidate: string): Promise<BenchmarkReportCompareResponse> {
+  return request("/api/benchmark/reports/compare/", {
+    method: "POST",
+    body: JSON.stringify({ baseline, candidate }),
   });
 }
 

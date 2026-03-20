@@ -277,6 +277,34 @@ export interface RecommendationTaskResponse {
   output: RecommendationPayload;
 }
 
+export interface BenchmarkReportSummary {
+  name: string;
+  size: number;
+  updated_at: string;
+  meta?: Record<string, unknown>;
+  config?: Record<string, unknown>;
+  summary?: Record<string, unknown>;
+}
+
+export interface BenchmarkReportListResponse {
+  reports: BenchmarkReportSummary[];
+}
+
+export interface BenchmarkReportDetailResponse {
+  name: string;
+  report: Record<string, unknown>;
+}
+
+export interface BenchmarkReportCompareResponse {
+  baseline: string;
+  candidate: string;
+  diff: {
+    baseline?: Record<string, unknown>;
+    candidate?: Record<string, unknown>;
+    metrics?: Record<string, { baseline?: unknown; candidate?: unknown; delta?: number | null }>;
+  };
+}
+
 export interface UserProfile {
   id: number;
   username: string;
