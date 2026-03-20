@@ -23,6 +23,12 @@ docker compose up -d postgres redis
 ```
 如果本机已有 PostgreSQL / Redis 占用默认端口，可在 `.env` 中覆盖 `POSTGRES_HOST_PORT` / `REDIS_HOST_PORT`。
 
+Windows 下可直接执行：
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\ensure-dev-infra.ps1
+```
+该脚本会尝试拉起 Docker Desktop，并等待 PostgreSQL / Redis 端口就绪。
+
 **后端**
 ```bash
 py -3.11 -m venv .venv
