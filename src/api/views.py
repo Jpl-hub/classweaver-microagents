@@ -25,7 +25,7 @@ from src.services import ppt as ppt_service
 from src.services.jobs import enqueue_prestudy_job
 from src.services import recommendation as recommendation_service
 from src.services.scoring import score_quiz
-from src.services.citations import build_citations
+from src.services.citations import build_citations, ensure_answer_citations
 from src.agents.utils import build_client
 
 from .serializers import (
@@ -458,7 +458,8 @@ class KnowledgeQaView(APIView):
             logger.exception("Knowledge QA generation failed")
             return Response({"detail": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        return Response({"answer": answer, "contexts": contexts, "citations": build_citations(contexts, limit=top_k)})
+        citations = build_citations(contexts, limit=top_k)
+        return Response({"answer": ensure_answer_citations(answer, citations), "contexts": contexts, "citations": citations})
 
 
 class KnowledgeDocumentListView(APIView):

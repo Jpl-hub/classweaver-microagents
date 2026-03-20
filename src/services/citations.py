@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, Iterable, List
 
 
@@ -44,3 +45,19 @@ def build_citations(entries: Iterable[Dict[str, Any]], *, limit: int = 5) -> Lis
             break
     return citations
 
+
+def extract_citation_markers(text: str) -> List[int]:
+    markers = re.findall(r"\[(\d+)\]", text or "")
+    return [int(item) for item in markers]
+
+
+def ensure_answer_citations(answer: str, citations: List[Dict[str, Any]]) -> str:
+    if not citations:
+        return answer
+    if extract_citation_markers(answer):
+        return answer
+    summary = " ".join(
+        f"{citation.get('label', f'[{index}]')}{citation.get('title') or citation.get('doc_id') or '未命名文档'}"
+        for index, citation in enumerate(citations, start=1)
+    )
+    return f"{answer.rstrip()}\n\n参考来源：{summary}".strip()
