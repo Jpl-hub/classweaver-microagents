@@ -30,6 +30,8 @@ py -3.11 -m venv .venv
 pip install -r requirements.txt -r requirements-dev.txt
 cp .env.example .env            # 配置 PostgreSQL / Redis / API_KEY / 模型
                                 # 若改了 POSTGRES_HOST_PORT，也要同步更新 DATABASE_URL / POSTGRES_PORT
+                                # 若前端端口不是 5173，请同步维护 FRONTEND_ORIGINS / CSRF_TRUSTED_ORIGINS
+                                # 本地 HTTP 开发请保持 SESSION/CSRF_COOKIE_SAMESITE=Lax；只有 HTTPS 反向代理下再改成 None
 python manage.py makemigrations core
 python manage.py migrate
 python manage.py runserver 0.0.0.0:8000

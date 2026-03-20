@@ -127,13 +127,23 @@ SPECTACULAR_SETTINGS = {
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = os.getenv("CORS_ALLOW_ALL_ORIGINS", "false").lower() in {"1", "true", "yes"}
 if not CORS_ALLOW_ALL_ORIGINS:
-    frontend_origin = os.getenv("FRONTEND_ORIGIN", "http://127.0.0.1:5173")
-    CORS_ALLOWED_ORIGINS = [frontend_origin]
+    frontend_origins = [
+        origin.strip()
+        for origin in os.getenv(
+            "FRONTEND_ORIGINS",
+            os.getenv("FRONTEND_ORIGIN", "http://127.0.0.1:5173"),
+        ).split(",")
+        if origin.strip()
+    ]
+    CORS_ALLOWED_ORIGINS = frontend_origins
 
 # CSRF trusted origins（用于本地前端调试）
 CSRF_TRUSTED_ORIGINS = [
     origin.strip()
-    for origin in os.getenv("CSRF_TRUSTED_ORIGINS", "http://127.0.0.1:5173,http://localhost:5173").split(",")
+    for origin in os.getenv(
+        "CSRF_TRUSTED_ORIGINS",
+        "http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:5174,http://localhost:5174",
+    ).split(",")
     if origin.strip()
 ]
 
@@ -146,6 +156,11 @@ SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "false").lower() in {
 CSRF_COOKIE_SECURE = os.getenv("CSRF_COOKIE_SECURE", "false").lower() in {"1", "true", "yes"}
 SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "Lax")
 CSRF_COOKIE_SAMESITE = os.getenv("CSRF_COOKIE_SAMESITE", SESSION_COOKIE_SAMESITE)
+
+if not SESSION_COOKIE_SECURE and str(SESSION_COOKIE_SAMESITE).lower() == "none":
+    SESSION_COOKIE_SAMESITE = "Lax"
+if not CSRF_COOKIE_SECURE and str(CSRF_COOKIE_SAMESITE).lower() == "none":
+    CSRF_COOKIE_SAMESITE = "Lax"
 
 # Agent configuration environment defaults for use in services
 AGENT_SETTINGS: Dict[str, Any] = {
