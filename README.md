@@ -50,7 +50,7 @@ npm run build          # 部署使用
 
 ## 使用要点
 - 会话：前端缓存用户信息；任意接口 401 会清空缓存并跳转登录。
-- 知识库：上传必须带 base_id，检索/问答只在当前库；默认使用 pgvector，并启用 dense + lexical 的 hybrid retrieval；切换到 FAISS 时索引写入 `data/` 且不会入仓库。
+- 知识库：上传必须带 base_id，检索/问答只在当前库；默认使用 pgvector，并启用 dense + lexical hybrid retrieval + 轻量 rerank；切换到 FAISS 时索引写入 `data/` 且不会入仓库。
 - 时间线：单列滚动区，拖拽即可调整学习顺序，陪学助教可直接引用。
 - 预习任务：接口负责入队，实际执行由 Celery worker 处理。
 

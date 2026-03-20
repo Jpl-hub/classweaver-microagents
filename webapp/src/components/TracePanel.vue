@@ -20,6 +20,7 @@
         <div v-if="item.rag?.enabled" class="text-xs text-emerald-600">
           RAG 后端：{{ (item.rag.backend as string) || "未设置" }}
           <span v-if="item.rag.hybrid_enabled"> · hybrid</span>
+          <span v-if="item.rag.rerank_enabled"> · rerank</span>
           <span v-if="typeof item.rag.total_entries === 'number'"> · corpus {{ item.rag.total_entries }}</span>
           <span v-if="typeof item.rag.search_k === 'number'"> · search_k {{ item.rag.search_k }}</span>
         </div>

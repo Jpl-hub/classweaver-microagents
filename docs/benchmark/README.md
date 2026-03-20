@@ -50,5 +50,7 @@ python manage.py evaluate_qa_citations --base-id 1 --dataset docs/benchmark/qa_c
 ## 当前实验开关
 
 - `HYBRID_RETRIEVAL=true|false`
+- `RERANK_ENABLED=true|false`
 - `true` 时启用 dense 向量召回 + lexical 召回 + RRF 融合
-- 建议分别运行纯 dense 与 hybrid 两组评测报告，直接比较指标差异
+- `RERANK_ENABLED=true` 时启用轻量 query-aware rerank
+- 建议分别运行 pure dense / hybrid / hybrid+rereank 三组评测报告，直接比较指标差异

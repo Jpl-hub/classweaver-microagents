@@ -5,6 +5,7 @@ from django.conf import settings
 from src.agents.utils import build_client
 from src.core.models import KnowledgeBase, KnowledgeDocument
 
+from .rerank import rerank_results
 from .store import get_store
 
 
@@ -43,6 +44,7 @@ def _summarize_retrieval_diagnostics(
     query: str,
     backend: str,
     hybrid_enabled: bool,
+    rerank_enabled: bool,
     total_entries: int,
     search_k: int,
     vector_results: List[tuple[float, Dict[str, Any]]],
@@ -58,6 +60,7 @@ def _summarize_retrieval_diagnostics(
         "query_length": len(query),
         "backend": backend,
         "hybrid_enabled": hybrid_enabled,
+        "rerank_enabled": rerank_enabled,
         "total_entries": total_entries,
         "search_k": search_k,
         "vector_hits": len(vector_results),
@@ -91,7 +94,7 @@ def retrieve_context_with_diagnostics(
         KnowledgeDocument.objects.filter(base=base, user=base.user).values_list("doc_id", flat=True)
     )
     if not doc_ids:
-        return {"results": [], "diagnostics": {"query_length": len(query), "backend": settings.AGENT_SETTINGS["vector_backend"], "hybrid_enabled": settings.AGENT_SETTINGS.get("hybrid_retrieval", False)}}
+        return {"results": [], "diagnostics": {"query_length": len(query), "backend": settings.AGENT_SETTINGS["vector_backend"], "hybrid_enabled": settings.AGENT_SETTINGS.get("hybrid_retrieval", False), "rerank_enabled": settings.AGENT_SETTINGS.get("rerank_enabled", False)}}
 
     agent_settings = settings.AGENT_SETTINGS
     client = build_client(agent_settings)
@@ -101,7 +104,7 @@ def retrieve_context_with_diagnostics(
     store = get_store(agent_settings["vector_backend"])
     allowed_set = [doc_id for doc_id in doc_ids if doc_id]
     if not allowed_set:
-        return {"results": [], "diagnostics": {"query_length": len(query), "backend": agent_settings["vector_backend"], "hybrid_enabled": agent_settings.get("hybrid_retrieval", False)}}
+        return {"results": [], "diagnostics": {"query_length": len(query), "backend": agent_settings["vector_backend"], "hybrid_enabled": agent_settings.get("hybrid_retrieval", False), "rerank_enabled": agent_settings.get("rerank_enabled", False)}}
     total_entries = store.count(base_id=base.pk, doc_ids=allowed_set)
     if total_entries <= 0:
         return {
@@ -110,6 +113,7 @@ def retrieve_context_with_diagnostics(
                 query=query,
                 backend=agent_settings["vector_backend"],
                 hybrid_enabled=agent_settings.get("hybrid_retrieval", False),
+                rerank_enabled=agent_settings.get("rerank_enabled", False),
                 total_entries=0,
                 search_k=0,
                 vector_results=[],
@@ -125,6 +129,8 @@ def retrieve_context_with_diagnostics(
         results = _fuse_ranked_results(vector_results, lexical_results, top_k=search_k)
     else:
         results = vector_results
+    if results and agent_settings.get("rerank_enabled", True):
+        results = rerank_results(query=query, results=results, top_k=search_k)
     if not results:
         return {
             "results": [],
@@ -132,6 +138,7 @@ def retrieve_context_with_diagnostics(
                 query=query,
                 backend=agent_settings["vector_backend"],
                 hybrid_enabled=agent_settings.get("hybrid_retrieval", False),
+                rerank_enabled=agent_settings.get("rerank_enabled", True),
                 total_entries=total_entries,
                 search_k=search_k,
                 vector_results=vector_results,
@@ -157,6 +164,8 @@ def retrieve_context_with_diagnostics(
                 "metadata": {
                     **(metadata.get("metadata", {}) or {}),
                     "retrieval_sources": metadata.get("retrieval_sources", ["vector"]),
+                    "rerank_score": metadata.get("rerank_score"),
+                    "overlap_score": metadata.get("overlap_score"),
                 },
             }
         )
@@ -166,6 +175,7 @@ def retrieve_context_with_diagnostics(
             query=query,
             backend=agent_settings["vector_backend"],
             hybrid_enabled=agent_settings.get("hybrid_retrieval", False),
+            rerank_enabled=agent_settings.get("rerank_enabled", True),
             total_entries=total_entries,
             search_k=search_k,
             vector_results=vector_results,
