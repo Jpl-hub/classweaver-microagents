@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -16,6 +17,22 @@ except ImportError:  # pragma: no cover - handled via runtime checks
     faiss = None
 
 logger = logging.getLogger(__name__)
+
+
+def _tokenize(text: str) -> List[str]:
+    raw = (text or "").lower()
+    words = re.findall(r"[a-z0-9_]+", raw)
+    cjk_chars = re.findall(r"[\u4e00-\u9fff]", raw)
+    return words + cjk_chars
+
+
+def _keyword_overlap_score(query: str, text: str) -> float:
+    query_tokens = _tokenize(query)
+    text_tokens = set(_tokenize(text))
+    if not query_tokens or not text_tokens:
+        return 0.0
+    matched = sum(1 for token in query_tokens if token in text_tokens)
+    return matched / len(query_tokens)
 
 
 class VectorStoreError(RuntimeError):
@@ -121,6 +138,28 @@ class FaissStore:
             results.append((float(score), meta))
         return results
 
+    def lexical_search(
+        self,
+        query: str,
+        top_k: int,
+        *,
+        base_id: int | None = None,
+        doc_ids: List[str] | None = None,
+    ) -> List[Tuple[float, Dict[str, Any]]]:
+        doc_id_set = set(doc_ids or [])
+        scored: List[Tuple[float, Dict[str, Any]]] = []
+        for meta in self.metadata:
+            if base_id is not None and str(meta.get("base_id")) != str(base_id):
+                continue
+            if doc_id_set and meta.get("doc_id") not in doc_id_set:
+                continue
+            score = _keyword_overlap_score(query, str(meta.get("text", "")))
+            if score <= 0:
+                continue
+            scored.append((score, meta))
+        scored.sort(key=lambda item: item[0], reverse=True)
+        return scored[:top_k]
+
     def _save(self) -> None:
         self.index_path.parent.mkdir(parents=True, exist_ok=True)
         self.meta_path.parent.mkdir(parents=True, exist_ok=True)
@@ -184,6 +223,41 @@ class PgVectorStore:
                 )
             )
         return results
+
+    def lexical_search(
+        self,
+        query: str,
+        top_k: int,
+        *,
+        base_id: int | None = None,
+        doc_ids: List[str] | None = None,
+    ) -> List[Tuple[float, Dict[str, Any]]]:
+        queryset = KnowledgeChunk.objects.select_related("document")
+        if base_id is not None:
+            queryset = queryset.filter(document__base_id=base_id)
+        if doc_ids:
+            queryset = queryset.filter(document__doc_id__in=doc_ids)
+
+        scored: List[Tuple[float, Dict[str, Any]]] = []
+        for chunk in queryset.only("chunk_id", "text", "metadata", "document__doc_id", "document__base_id", "document__title"):
+            score = _keyword_overlap_score(query, chunk.text)
+            if score <= 0:
+                continue
+            scored.append(
+                (
+                    score,
+                    {
+                        "doc_id": chunk.document.doc_id,
+                        "chunk_id": chunk.chunk_id,
+                        "text": chunk.text,
+                        "base_id": chunk.document.base_id,
+                        "title": chunk.document.title,
+                        "metadata": chunk.metadata or {},
+                    },
+                )
+            )
+        scored.sort(key=lambda item: item[0], reverse=True)
+        return scored[:top_k]
 
     def upsert_embeddings(self, *, embeddings: List[List[float]], metadata: List[Dict[str, Any]]) -> None:
         self._ensure_postgres()

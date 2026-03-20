@@ -160,6 +160,7 @@ AGENT_SETTINGS: Dict[str, Any] = {
     "vstore_path": os.getenv("VSTORE_PATH", "data/faiss.index"),
     "vstore_meta": os.getenv("VSTORE_META", "data/chunks.jsonl"),
     "rag_enabled": os.getenv("RAG_ENABLED", "true").lower() in {"1", "true", "yes"},
+    "hybrid_retrieval": os.getenv("HYBRID_RETRIEVAL", "true").lower() in {"1", "true", "yes"},
     "agentscope_enabled": os.getenv("AGENTSCOPE_ENABLED", "false").lower() in {"1", "true", "yes"},
 }
 

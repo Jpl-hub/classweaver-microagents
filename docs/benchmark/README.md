@@ -46,3 +46,9 @@ python manage.py evaluate_qa_citations --base-id 1 --dataset docs/benchmark/qa_c
 - 先为常见问答构造 20-50 条小规模数据集
 - 每次调整切分、embedding、pgvector 参数、hybrid retrieval 或 rerank 后都跑一遍
 - 将报告保存在 `reports/` 或单独的 benchmark 目录，逐步形成版本对比
+
+## 当前实验开关
+
+- `HYBRID_RETRIEVAL=true|false`
+- `true` 时启用 dense 向量召回 + lexical 召回 + RRF 融合
+- 建议分别运行纯 dense 与 hybrid 两组评测报告，直接比较指标差异
