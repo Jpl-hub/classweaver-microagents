@@ -58,6 +58,7 @@ npm run build          # 部署使用
 - `docs/需求分析.md`：角色与需求
 - `docs/详细设计.md`：模块与数据设计
 - `docs/用户手册.md`：操作指南与常见问题
+- `docs/benchmark/README.md`：检索评测数据集与运行说明
 
 ## 测试
 后端：`pytest -q`（默认内存 SQLite；如需真实库请设置 `DATABASE_URL`）。  

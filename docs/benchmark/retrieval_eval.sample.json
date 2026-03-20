@@ -1,0 +1,22 @@
+{
+  "cases": [
+    {
+      "query": "卷积神经网络中的卷积层主要作用是什么？",
+      "expected_refs": [
+        {
+          "doc_id": "replace-with-doc-id",
+          "chunk_id": "replace-with-chunk-id"
+        }
+      ]
+    },
+    {
+      "query": "梯度下降如何更新参数？",
+      "expected_refs": [
+        {
+          "doc_id": "replace-with-doc-id",
+          "chunk_id": "replace-with-chunk-id"
+        }
+      ]
+    }
+  ]
+}
