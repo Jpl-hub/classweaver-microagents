@@ -29,6 +29,10 @@ python manage.py evaluate_retrieval --base-id 1 --dataset docs/benchmark/retriev
 python manage.py evaluate_qa_citations --base-id 1 --dataset docs/benchmark/qa_citation_eval.sample.json --top-k 4
 ```
 
+```bash
+python manage.py compare_benchmark_reports --baseline reports/dense.json --candidate reports/hybrid.json
+```
+
 ## 当前指标
 
 - `hit_rate`: top-k 中是否至少命中一个标准引用
@@ -46,6 +50,8 @@ python manage.py evaluate_qa_citations --base-id 1 --dataset docs/benchmark/qa_c
 - 先为常见问答构造 20-50 条小规模数据集
 - 每次调整切分、embedding、pgvector 参数、hybrid retrieval 或 rerank 后都跑一遍
 - 将报告保存在 `reports/` 或单独的 benchmark 目录，逐步形成版本对比
+- 新版报告会自动记录 `vector_backend / hybrid_retrieval / rerank_enabled / embedding_model`
+- 可用 `compare_benchmark_reports` 直接对比两份 JSON 报告的 summary 指标差异
 
 ## 当前实验开关
 

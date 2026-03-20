@@ -1,11 +1,12 @@
 import json
 from pathlib import Path
 
+from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
 from src.core.models import KnowledgeBase
 from src.kb.retrieve import retrieve_context
-from src.services.evaluation import evaluate_retrieval_cases
+from src.services.evaluation import build_report_metadata, evaluate_retrieval_cases
 
 
 class Command(BaseCommand):
@@ -46,7 +47,16 @@ class Command(BaseCommand):
             "base_name": base.name,
             "top_k": options["top_k"],
             "dataset": str(dataset_path),
+            "vector_backend": settings.AGENT_SETTINGS.get("vector_backend"),
+            "hybrid_retrieval": settings.AGENT_SETTINGS.get("hybrid_retrieval"),
+            "rerank_enabled": settings.AGENT_SETTINGS.get("rerank_enabled"),
+            "embedding_model": settings.AGENT_SETTINGS.get("embedding_model"),
         }
+        report["meta"] = build_report_metadata(
+            report_type="retrieval",
+            dataset=str(dataset_path),
+            top_k=options["top_k"],
+        )
 
         rendered = json.dumps(report, ensure_ascii=False, indent=2)
         output = options.get("output")

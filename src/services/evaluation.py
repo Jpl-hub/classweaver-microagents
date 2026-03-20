@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any, Callable, Dict, Iterable, List, Sequence
 
 from src.services.citations import extract_citation_markers
@@ -212,4 +213,39 @@ def evaluate_citation_cases(
             "avg_valid_marker_rate": round(sum(item.valid_marker_rate for item in case_results) / total, 4),
         },
         "cases": [item.to_dict() for item in case_results],
+    }
+
+
+def build_report_metadata(*, report_type: str, dataset: str, top_k: int, extra: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    payload = {
+        "report_type": report_type,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "dataset": dataset,
+        "top_k": top_k,
+    }
+    if extra:
+        payload.update(extra)
+    return payload
+
+
+def compare_report_summaries(*, baseline: Dict[str, Any], candidate: Dict[str, Any]) -> Dict[str, Any]:
+    baseline_summary = baseline.get("summary") or {}
+    candidate_summary = candidate.get("summary") or {}
+    metrics = sorted(set(baseline_summary.keys()) | set(candidate_summary.keys()))
+    deltas: Dict[str, Dict[str, Any]] = {}
+    for metric in metrics:
+        baseline_value = baseline_summary.get(metric)
+        candidate_value = candidate_summary.get(metric)
+        delta: float | None = None
+        if isinstance(baseline_value, (int, float)) and isinstance(candidate_value, (int, float)):
+            delta = round(float(candidate_value) - float(baseline_value), 4)
+        deltas[metric] = {
+            "baseline": baseline_value,
+            "candidate": candidate_value,
+            "delta": delta,
+        }
+    return {
+        "baseline": baseline.get("config") or {},
+        "candidate": candidate.get("config") or {},
+        "metrics": deltas,
     }
