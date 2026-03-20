@@ -4,6 +4,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional
 
+import httpx
 from openai import (
     APIConnectionError,
     APITimeoutError,
@@ -46,7 +47,12 @@ class OpenAIClient:
     max_retries: int
 
     def __post_init__(self) -> None:
-        self._client = OpenAI(api_key=self.api_key, base_url=self.base_url, timeout=self.request_timeout)
+        self._client = OpenAI(
+            api_key=self.api_key,
+            base_url=self.base_url,
+            timeout=self.request_timeout,
+            http_client=httpx.Client(timeout=self.request_timeout, trust_env=False),
+        )
 
     def chat(
         self,
@@ -77,7 +83,7 @@ class OpenAIClient:
             except RETRYABLE_OPENAI_ERRORS as exc:
                 logger.warning("Chat completion failed on attempt %s/%s: %s", attempt, self.max_retries, exc)
                 if attempt >= self.max_retries:
-                    raise AgentInvocationError("Exceeded maximum retries for chat completion.") from exc
+                    raise AgentInvocationError(f"Exceeded maximum retries for chat completion: {exc}") from exc
                 time.sleep(1.0)
             except NON_RETRYABLE_OPENAI_ERRORS as exc:
                 raise AgentInvocationError(f"Chat completion rejected by API: {exc}") from exc
@@ -95,7 +101,7 @@ class OpenAIClient:
             except RETRYABLE_OPENAI_ERRORS as exc:
                 logger.warning("Embedding request failed on attempt %s/%s: %s", attempt, self.max_retries, exc)
                 if attempt >= self.max_retries:
-                    raise AgentInvocationError("Exceeded maximum retries for embedding.") from exc
+                    raise AgentInvocationError(f"Exceeded maximum retries for embedding: {exc}") from exc
                 time.sleep(1.0)
             except NON_RETRYABLE_OPENAI_ERRORS as exc:
                 raise AgentInvocationError(f"Embedding request rejected by API: {exc}") from exc

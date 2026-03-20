@@ -30,6 +30,7 @@ corpus/
 # Logs
 *.log
 logs/
+.codex-run/
 
 # IDE / editor
 .vscode/
