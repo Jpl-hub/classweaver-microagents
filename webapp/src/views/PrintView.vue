@@ -261,6 +261,10 @@ onMounted(() => {
   if (statePrintable) {
     printable.value = statePrintable;
     saveToStorage({ jobId: jobId.value, printable: statePrintable });
+    if (jobId.value) {
+      fetchPrintable();
+      return;
+    }
     loading.value = false;
     return;
   }
@@ -268,10 +272,14 @@ onMounted(() => {
   const stored = loadFromStorage();
   if (stored && (!jobId.value || !stored.jobId || stored.jobId === jobId.value)) {
     printable.value = stored.printable;
-    loading.value = false;
     if (jobId.value && stored.jobId !== jobId.value) {
       saveToStorage({ jobId: jobId.value, printable: stored.printable });
     }
+    if (jobId.value) {
+      fetchPrintable();
+      return;
+    }
+    loading.value = false;
     return;
   }
 

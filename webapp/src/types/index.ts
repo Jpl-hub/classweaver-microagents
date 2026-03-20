@@ -23,6 +23,8 @@ export interface RetrievalDiagnostics {
   enabled?: boolean;
   backend?: string;
   hybrid_enabled?: boolean;
+  rerank_enabled?: boolean;
+  query_length?: number;
   total_entries?: number;
   search_k?: number;
   vector_hits?: number;

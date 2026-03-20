@@ -4,6 +4,20 @@ import re
 from typing import Any, Dict, Iterable, List
 
 
+def _normalize_doc_id(value: Any) -> str:
+    raw = str(value or "")
+    if "#" in raw:
+        return raw.split("#", 1)[0]
+    return raw
+
+
+def _normalize_chunk_id(value: Any) -> str:
+    raw = str(value or "")
+    if "#" in raw:
+        return raw.rsplit("#", 1)[-1]
+    return raw
+
+
 def _truncate_text(text: str, limit: int = 220) -> str:
     cleaned = " ".join((text or "").split())
     if len(cleaned) <= limit:
@@ -14,8 +28,8 @@ def _truncate_text(text: str, limit: int = 220) -> str:
 def normalize_citation(entry: Dict[str, Any], *, index: int | None = None) -> Dict[str, Any]:
     refs = entry.get("refs") or []
     primary_ref = refs[0] if isinstance(refs, list) and refs else {}
-    doc_id = entry.get("doc_id") or primary_ref.get("doc_id") or ""
-    chunk_id = entry.get("chunk_id") or primary_ref.get("chunk_id") or ""
+    doc_id = _normalize_doc_id(entry.get("doc_id") or primary_ref.get("doc_id") or "")
+    chunk_id = _normalize_chunk_id(entry.get("chunk_id") or primary_ref.get("chunk_id") or "")
     title = entry.get("title") or entry.get("source_title") or ""
     score = entry.get("score")
     citation = {
