@@ -11,6 +11,19 @@
       </button>
     </header>
 
+    <article v-if="suggestedPair" class="glass-panel space-y-3">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p class="text-xs uppercase tracking-[0.4em] text-slate-500">推荐对比</p>
+          <h2 class="text-lg font-semibold text-slate-900">{{ suggestedPair.baseline.name }} vs {{ suggestedPair.candidate.name }}</h2>
+          <p class="text-sm text-slate-500">自动识别到一组最适合展示“反思是否有效”的 review 对比报告。</p>
+        </div>
+        <button class="btn-primary text-xs" type="button" :disabled="compareLoading" @click="applySuggestedPair">
+          使用这组对比
+        </button>
+      </div>
+    </article>
+
     <section class="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
       <article class="glass-panel space-y-4">
         <div class="flex items-center justify-between">
@@ -113,6 +126,12 @@
               </p>
             </article>
           </div>
+          <div v-if="compareInsights.length" class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+            <p class="text-[11px] uppercase tracking-[0.25em] text-slate-400">结论摘要</p>
+            <ul class="mt-3 space-y-2 text-sm text-slate-700">
+              <li v-for="item in compareInsights" :key="item">{{ item }}</li>
+            </ul>
+          </div>
         </article>
       </div>
     </section>
@@ -153,6 +172,36 @@ const compareMetrics = computed(() =>
     delta: Number(metric.delta ?? 0),
   })),
 );
+const suggestedPair = computed(() => {
+  const reviewReports = reports.value.filter((report) => report.meta?.report_type === "review_cycles");
+  const baseline = reviewReports.find((report) => report.config?.review_enabled === false);
+  const candidate = reviewReports.find((report) => report.config?.review_enabled === true);
+  if (!baseline || !candidate) return null;
+  return { baseline, candidate };
+});
+const compareInsights = computed(() => {
+  const metrics = compareResult.value?.diff?.metrics ?? {};
+  const insights: string[] = [];
+  const overallDelta = Number(metrics.avg_final_overall?.delta ?? 0);
+  const scoreDelta = Number(metrics.avg_score_delta?.candidate ?? 0);
+  const acceptRate = Number(metrics.review_accept_rate?.candidate ?? 0);
+  const triggerRate = Number(metrics.review_trigger_rate?.candidate ?? 0);
+
+  if (triggerRate > 0) {
+    insights.push(`review 已经真正参与执行，触发率 ${triggerRate.toFixed(2)}。`);
+  }
+  if (overallDelta > 0) {
+    insights.push(`开启 review 后最终平均分提升 ${overallDelta.toFixed(2)}。`);
+  } else if (overallDelta === 0 && scoreDelta > 0) {
+    insights.push(`开启 review 后最终平均分至少守住基线，同时 review 平均增益为 +${scoreDelta.toFixed(2)}。`);
+  } else if (overallDelta < 0) {
+    insights.push(`开启 review 后最终平均分下降 ${Math.abs(overallDelta).toFixed(2)}，策略仍需继续优化。`);
+  }
+  if (acceptRate > 0) {
+    insights.push(`当前有 ${(acceptRate * 100).toFixed(0)}% 的 review 候选被采纳，说明采纳策略已经开始过滤负增益结果。`);
+  }
+  return insights;
+});
 
 async function loadReports() {
   loading.value = true;
@@ -162,6 +211,11 @@ async function loadReports() {
     reports.value = payload.reports ?? [];
     if (!selectedName.value && reports.value.length) {
       await selectReport(reports.value[0].name);
+    }
+    if (suggestedPair.value && !compareResult.value) {
+      baselineName.value = suggestedPair.value.baseline.name;
+      candidateName.value = suggestedPair.value.candidate.name;
+      await runCompare();
     }
   } catch (err) {
     error.value = (err as Error).message;
@@ -184,6 +238,13 @@ async function runCompare() {
   } finally {
     compareLoading.value = false;
   }
+}
+
+async function applySuggestedPair() {
+  if (!suggestedPair.value) return;
+  baselineName.value = suggestedPair.value.baseline.name;
+  candidateName.value = suggestedPair.value.candidate.name;
+  await runCompare();
 }
 
 function formatNumber(value: unknown) {
