@@ -21,6 +21,7 @@
 ```bash
 docker compose up -d postgres redis
 ```
+如果本机已有 PostgreSQL / Redis 占用默认端口，可在 `.env` 中覆盖 `POSTGRES_HOST_PORT` / `REDIS_HOST_PORT`。
 
 **后端**
 ```bash
@@ -28,6 +29,7 @@ py -3.11 -m venv .venv
 . .venv/Scripts/activate        # Windows
 pip install -r requirements.txt -r requirements-dev.txt
 cp .env.example .env            # 配置 PostgreSQL / Redis / API_KEY / 模型
+                                # 若改了 POSTGRES_HOST_PORT，也要同步更新 DATABASE_URL / POSTGRES_PORT
 python manage.py makemigrations core
 python manage.py migrate
 python manage.py runserver 0.0.0.0:8000

@@ -8,6 +8,7 @@ from celery import shared_task
 from django.db import close_old_connections
 from django.utils import timezone
 
+from src.agents.utils import AgentInvocationError
 from src.core.models import PrestudyJob
 
 from . import pipeline
@@ -15,7 +16,7 @@ from . import pipeline
 logger = logging.getLogger(__name__)
 
 
-@shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={"max_retries": 2})
+@shared_task(bind=True, autoretry_for=(AgentInvocationError,), retry_backoff=True, retry_kwargs={"max_retries": 2})
 def run_prestudy_job_task(self, *, job_id: int, text: str | None = None, ppt_payload: str | None = None, filename: str = "") -> None:
     close_old_connections()
     try:

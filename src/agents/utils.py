@@ -4,11 +4,32 @@ import time
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional
 
-from openai import OpenAI
+from openai import (
+    APIConnectionError,
+    APITimeoutError,
+    AuthenticationError,
+    BadRequestError,
+    InternalServerError,
+    OpenAI,
+    OpenAIError,
+    RateLimitError,
+)
 from openai.types import CreateEmbeddingResponse
 
 
 logger = logging.getLogger(__name__)
+
+RETRYABLE_OPENAI_ERRORS = (
+    APIConnectionError,
+    APITimeoutError,
+    RateLimitError,
+    InternalServerError,
+)
+
+NON_RETRYABLE_OPENAI_ERRORS = (
+    AuthenticationError,
+    BadRequestError,
+)
 
 
 class AgentInvocationError(RuntimeError):
@@ -53,11 +74,15 @@ class OpenAIClient:
                 if content is None:
                     raise AgentInvocationError("Received empty response from chat completion.")
                 return content
-            except Exception as exc:  # noqa: BLE001
+            except RETRYABLE_OPENAI_ERRORS as exc:
                 logger.warning("Chat completion failed on attempt %s/%s: %s", attempt, self.max_retries, exc)
                 if attempt >= self.max_retries:
                     raise AgentInvocationError("Exceeded maximum retries for chat completion.") from exc
                 time.sleep(1.0)
+            except NON_RETRYABLE_OPENAI_ERRORS as exc:
+                raise AgentInvocationError(f"Chat completion rejected by API: {exc}") from exc
+            except OpenAIError as exc:
+                raise AgentInvocationError(f"Chat completion failed: {exc}") from exc
 
     def embed(self, *, model: str, texts: Iterable[str]) -> List[List[float]]:
         attempt = 0
@@ -67,11 +92,15 @@ class OpenAIClient:
             try:
                 response: CreateEmbeddingResponse = self._client.embeddings.create(model=model, input=text_list)
                 return [item.embedding for item in response.data]
-            except Exception as exc:  # noqa: BLE001
+            except RETRYABLE_OPENAI_ERRORS as exc:
                 logger.warning("Embedding request failed on attempt %s/%s: %s", attempt, self.max_retries, exc)
                 if attempt >= self.max_retries:
                     raise AgentInvocationError("Exceeded maximum retries for embedding.") from exc
                 time.sleep(1.0)
+            except NON_RETRYABLE_OPENAI_ERRORS as exc:
+                raise AgentInvocationError(f"Embedding request rejected by API: {exc}") from exc
+            except OpenAIError as exc:
+                raise AgentInvocationError(f"Embedding request failed: {exc}") from exc
 
 
 def parse_agent_json(payload: str) -> Dict[str, Any]:
