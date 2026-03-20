@@ -19,6 +19,7 @@ def orchestrate_pipeline(
     rag_chunks: List[Dict[str, Any]],
     rag_diagnostics: Dict[str, Any],
     settings: Dict[str, Any],
+    cycle_label: str = "initial",
 ) -> Dict[str, Any]:
     """Coordinate planner -> rewriter -> tutor agents."""
     trace: List[Dict[str, Any]] = []
@@ -36,6 +37,7 @@ def orchestrate_pipeline(
             {
                 "orchestrator": "pipeline",
                 "step": "planner",
+                "cycle": cycle_label,
                 "provider": "qwen",
                 "model": settings["qwen_model"],
                 "base_url": settings["base_url"],
@@ -53,6 +55,7 @@ def orchestrate_pipeline(
             {
                 "orchestrator": "pipeline",
                 "step": "rewriter",
+                "cycle": cycle_label,
                 "provider": "deepseek",
                 "model": settings["deepseek_model"],
                 "base_url": settings["base_url"],
@@ -75,6 +78,7 @@ def orchestrate_pipeline(
             {
                 "orchestrator": "pipeline",
                 "step": "tutor",
+                "cycle": cycle_label,
                 "provider": "qwen",
                 "model": settings["qwen_model"],
                 "base_url": settings["base_url"],
@@ -100,6 +104,7 @@ def orchestrate_pipeline(
             {
                 "orchestrator": "pipeline",
                 "step": "evaluator",
+                "cycle": cycle_label,
                 "provider": "qwen",
                 "model": settings["qwen_model"],
                 "base_url": settings["base_url"],

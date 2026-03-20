@@ -380,7 +380,12 @@
           </div>
         </article>
         <RetrievalDiagnosticsCard v-if="job" :diagnostics="retrievalDiagnostics" />
-        <EvaluationInsightsCard v-if="job" :evaluation="evaluationInsights" :reflection="reflectionInsights" />
+        <EvaluationInsightsCard
+          v-if="job"
+          :evaluation="evaluationInsights"
+          :reflection="reflectionInsights"
+          :review-summary="reviewSummary"
+        />
         <TracePanel v-if="job" :items="modelTraceItems" />
       </div>
     </section>
@@ -651,6 +656,9 @@ const evaluationInsights = computed(
 );
 const reflectionInsights = computed(
   () => ((job.value?.final_json?.reflection as Record<string, unknown> | null | undefined) ?? null),
+);
+const reviewSummary = computed(
+  () => ((job.value?.final_json?.review_summary as Record<string, unknown> | null | undefined) ?? null),
 );
 const retrievalDiagnostics = computed(
   () =>

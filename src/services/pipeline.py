@@ -38,6 +38,50 @@ def _collect_rag_context(
     return payload
 
 
+def _score_of(payload: Dict[str, Any]) -> int:
+    evaluation = payload.get("evaluation") or {}
+    scores = evaluation.get("scores") or {}
+    return int(scores.get("overall", 0) or 0)
+
+
+def _should_run_review_cycle(
+    *,
+    final_payload: Dict[str, Any],
+    settings_map: Dict[str, Any],
+    round_index: int,
+) -> bool:
+    if not settings_map.get("review_enabled", True):
+        return False
+    if round_index >= max(0, int(settings_map.get("review_max_rounds", 0) or 0)):
+        return False
+    reflection = final_payload.get("reflection") or {}
+    return bool(reflection.get("should_expand_retrieval") or reflection.get("should_regenerate"))
+
+
+def _build_review_cycle_summary(
+    *,
+    round_index: int,
+    trigger: Dict[str, Any],
+    top_k: int,
+    initial_payload: Dict[str, Any],
+    revised_payload: Dict[str, Any],
+    diagnostics: Dict[str, Any],
+) -> Dict[str, Any]:
+    initial_score = _score_of(initial_payload)
+    revised_score = _score_of(revised_payload)
+    return {
+        "round": round_index,
+        "top_k": top_k,
+        "trigger": trigger,
+        "initial_overall_score": initial_score,
+        "revised_overall_score": revised_score,
+        "score_delta": revised_score - initial_score,
+        "retrieval_diagnostics": diagnostics,
+        "evaluation": revised_payload.get("evaluation") or {},
+        "reflection": revised_payload.get("reflection") or {},
+    }
+
+
 def run_pipeline(
     *,
     job: PrestudyJob,
@@ -63,7 +107,8 @@ def run_pipeline(
 
     agent_settings = settings.AGENT_SETTINGS
     client = build_client(agent_settings)
-    rag_payload = _collect_rag_context(job=job, text=extracted_text, top_k=5)
+    initial_top_k = 5
+    rag_payload = _collect_rag_context(job=job, text=extracted_text, top_k=initial_top_k)
     rag_chunks = rag_payload.get("results", [])
     rag_diagnostics = rag_payload.get("diagnostics", {})
 
@@ -78,8 +123,57 @@ def run_pipeline(
         rag_chunks=rag_chunks,
         settings=agent_settings,
         rag_diagnostics=rag_diagnostics,
+        cycle_label="initial",
     )
+    review_cycles: List[Dict[str, Any]] = []
+    current_rag_payload = rag_payload
+    current_result = pipeline_result
+    review_multiplier = max(2, int(agent_settings.get("review_top_k_multiplier", 2) or 2))
+    for round_index in range(1, max(0, int(agent_settings.get("review_max_rounds", 0) or 0)) + 1):
+        current_final = current_result.get("final_json", {}) or {}
+        if not _should_run_review_cycle(final_payload=current_final, settings_map=agent_settings, round_index=round_index - 1):
+            break
+        reflection = current_final.get("reflection") or {}
+        next_top_k = initial_top_k
+        if reflection.get("should_expand_retrieval"):
+            next_top_k = min(12, max(initial_top_k + 2, initial_top_k * review_multiplier))
+        current_rag_payload = _collect_rag_context(job=job, text=extracted_text, top_k=next_top_k)
+        revised_result = runtime.orchestrate_pipeline(
+            client=client,
+            planner_module=planner,
+            rewriter_module=rewriter,
+            tutor_module=tutor,
+            evaluator_module=evaluator,
+            text=extracted_text,
+            rag_chunks=current_rag_payload.get("results", []),
+            settings=agent_settings,
+            rag_diagnostics=current_rag_payload.get("diagnostics", {}),
+            cycle_label=f"review_{round_index}",
+        )
+        review_cycles.append(
+            _build_review_cycle_summary(
+                round_index=round_index,
+                trigger={
+                    "should_expand_retrieval": bool(reflection.get("should_expand_retrieval")),
+                    "should_regenerate": bool(reflection.get("should_regenerate")),
+                    "should_add_multimodal_review": bool(reflection.get("should_add_multimodal_review")),
+                },
+                top_k=next_top_k,
+                initial_payload=current_final,
+                revised_payload=revised_result.get("final_json", {}) or {},
+                diagnostics=current_rag_payload.get("diagnostics", {}),
+            )
+        )
+        current_result = {
+            **revised_result,
+            "model_trace": [*(current_result.get("model_trace", []) or []), *(revised_result.get("model_trace", []) or [])],
+        }
+        initial_top_k = next_top_k
+
     duration_ms = int((perf_counter() - start) * 1000)
+    pipeline_result = current_result
+    rag_chunks = current_rag_payload.get("results", [])
+    rag_diagnostics = current_rag_payload.get("diagnostics", {})
     source_citations = build_citations(rag_chunks, limit=5)
 
     planner_payload = pipeline_result.get("planner_json", {}) or {}
@@ -90,6 +184,14 @@ def run_pipeline(
     if rag_diagnostics:
         planner_payload["retrieval_diagnostics"] = rag_diagnostics
         final_payload["retrieval_diagnostics"] = rag_diagnostics
+    if review_cycles:
+        final_payload["review_summary"] = {
+            "executed_rounds": len(review_cycles),
+            "cycles": review_cycles,
+            "initial_overall_score": review_cycles[0].get("initial_overall_score"),
+            "final_overall_score": review_cycles[-1].get("revised_overall_score"),
+            "pending_multimodal_review": bool(review_cycles[-1].get("trigger", {}).get("should_add_multimodal_review")),
+        }
 
     job.planner_json = planner_payload
     job.final_json = final_payload

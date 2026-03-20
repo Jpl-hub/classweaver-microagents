@@ -93,17 +93,50 @@
           </ul>
         </article>
       </div>
+
+      <article v-if="reviewSummary?.executed_rounds" class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p class="text-[11px] uppercase tracking-[0.25em] text-slate-400">Review Cycle</p>
+            <h3 class="text-base font-semibold text-slate-900">反思驱动修正</h3>
+          </div>
+          <span class="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-600">
+            {{ reviewSummary.executed_rounds }} 轮
+          </span>
+        </div>
+        <div class="mt-3 grid gap-3 sm:grid-cols-3">
+          <article class="rounded-2xl border border-white/80 bg-white/80 p-3">
+            <p class="text-[11px] uppercase tracking-[0.2em] text-slate-400">初始分数</p>
+            <p class="mt-1 text-2xl font-semibold text-slate-900">{{ reviewSummary.initial_overall_score ?? 0 }}</p>
+          </article>
+          <article class="rounded-2xl border border-white/80 bg-white/80 p-3">
+            <p class="text-[11px] uppercase tracking-[0.2em] text-slate-400">最终分数</p>
+            <p class="mt-1 text-2xl font-semibold text-slate-900">{{ reviewSummary.final_overall_score ?? 0 }}</p>
+          </article>
+          <article class="rounded-2xl border border-white/80 bg-white/80 p-3">
+            <p class="text-[11px] uppercase tracking-[0.2em] text-slate-400">多模态复核</p>
+            <p class="mt-1 text-sm font-semibold text-slate-900">{{ reviewSummary.pending_multimodal_review ? "待接入" : "当前未触发" }}</p>
+          </article>
+        </div>
+        <ul class="mt-3 space-y-2 text-sm text-slate-700">
+          <li v-for="cycle in reviewSummary.cycles || []" :key="cycle.round" class="rounded-2xl border border-white/80 bg-white/80 px-3 py-2">
+            第 {{ cycle.round }} 轮：top_k {{ cycle.top_k }}，分数 {{ cycle.initial_overall_score ?? 0 }} -> {{ cycle.revised_overall_score ?? 0 }}
+            <span v-if="typeof cycle.score_delta === 'number'">（{{ cycle.score_delta >= 0 ? "+" : "" }}{{ cycle.score_delta }}）</span>
+          </li>
+        </ul>
+      </article>
     </template>
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import type { QualityEvaluation, ReflectionInsights } from "../types";
+import type { QualityEvaluation, ReflectionInsights, ReviewSummary } from "../types";
 
 const props = defineProps<{
   evaluation?: QualityEvaluation | null;
   reflection?: ReflectionInsights | null;
+  reviewSummary?: ReviewSummary | null;
 }>();
 
 const learnerExperience = computed(() => props.evaluation?.learner_experience ?? {});
@@ -168,4 +201,6 @@ const reflectionList = computed(() => {
   const items = [...(reflection.value?.diagnosis ?? []), ...(reflection.value?.next_actions ?? [])];
   return items.slice(0, 6);
 });
+
+const reviewSummary = computed(() => props.reviewSummary ?? null);
 </script>

@@ -11,6 +11,9 @@
         class="rounded border border-slate-200 bg-slate-50 p-3 text-sm leading-5"
       >
         <div class="font-medium text-slate-800">{{ item.step }} · {{ item.provider }}</div>
+        <div v-if="item.cycle" class="text-xs font-medium uppercase tracking-[0.2em] text-slate-500">
+          {{ item.cycle }}
+        </div>
         <div class="text-slate-600">
           {{ item.model }} @ {{ item.base_url }} — {{ item.latency_ms }} ms
         </div>

@@ -10,6 +10,7 @@ export interface QuizQuestion {
 export interface ModelTraceSegment {
   orchestrator: string;
   step: string;
+  cycle?: string;
   provider: string;
   model: string;
   base_url: string;
@@ -62,6 +63,26 @@ export interface ReflectionInsights {
   should_regenerate?: boolean;
   should_expand_retrieval?: boolean;
   should_add_multimodal_review?: boolean;
+}
+
+export interface ReviewCycleSummary {
+  round: number;
+  top_k: number;
+  trigger?: Record<string, boolean>;
+  initial_overall_score?: number;
+  revised_overall_score?: number;
+  score_delta?: number;
+  retrieval_diagnostics?: RetrievalDiagnostics;
+  evaluation?: QualityEvaluation;
+  reflection?: ReflectionInsights;
+}
+
+export interface ReviewSummary {
+  executed_rounds?: number;
+  cycles?: ReviewCycleSummary[];
+  initial_overall_score?: number;
+  final_overall_score?: number;
+  pending_multimodal_review?: boolean;
 }
 
 export interface QualityEvaluation {
@@ -130,6 +151,7 @@ export interface PrestudyResponse {
   retrieval_diagnostics?: RetrievalDiagnostics;
   evaluation?: QualityEvaluation;
   reflection?: ReflectionInsights;
+  review_summary?: ReviewSummary;
 }
 
 export interface PrestudyJobTicket {
