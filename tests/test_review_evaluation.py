@@ -23,6 +23,7 @@ def test_evaluate_review_cases_reports_review_deltas():
                                 "evaluation": {
                                     "scores": {"overall": 80, "groundedness": 84, "learner_fit": 78}
                                 },
+                                "accepted": True,
                             }
                         ],
                     },
@@ -51,6 +52,8 @@ def test_evaluate_review_cases_reports_review_deltas():
     assert report["summary"]["avg_score_delta"] == 9.0
     assert report["summary"]["avg_groundedness_delta"] == 9.5
     assert report["summary"]["avg_learner_fit_delta"] == 9.0
+    assert report["summary"]["review_accept_rate"] == 0.5
     assert report["cases"][0]["strategy"] == "full_pipeline"
     assert report["cases"][0]["pending_multimodal_review"] is True
+    assert report["cases"][0]["accepted"] is True
     assert report["cases"][1]["triggered_review"] is False

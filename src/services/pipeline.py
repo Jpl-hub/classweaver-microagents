@@ -44,6 +44,16 @@ def _score_of(payload: Dict[str, Any]) -> int:
     return int(scores.get("overall", 0) or 0)
 
 
+def _evaluation_scores(payload: Dict[str, Any]) -> Dict[str, int]:
+    evaluation = payload.get("evaluation") or {}
+    scores = evaluation.get("scores") or {}
+    return {
+        "overall": int(scores.get("overall", 0) or 0),
+        "groundedness": int(scores.get("groundedness", 0) or 0),
+        "learner_fit": int(scores.get("learner_fit", 0) or 0),
+    }
+
+
 def _should_run_review_cycle(
     *,
     final_payload: Dict[str, Any],
@@ -69,6 +79,8 @@ def _build_review_cycle_summary(
     initial_payload: Dict[str, Any],
     revised_payload: Dict[str, Any],
     diagnostics: Dict[str, Any],
+    accepted: bool,
+    decision_reason: str,
 ) -> Dict[str, Any]:
     initial_score = _score_of(initial_payload)
     revised_score = _score_of(revised_payload)
@@ -79,6 +91,8 @@ def _build_review_cycle_summary(
         "query_rewrite": query_rewrite or {},
         "top_k": top_k,
         "trigger": trigger,
+        "accepted": accepted,
+        "decision_reason": decision_reason,
         "initial_overall_score": initial_score,
         "revised_overall_score": revised_score,
         "score_delta": revised_score - initial_score,
@@ -87,6 +101,23 @@ def _build_review_cycle_summary(
         "evaluation": revised_payload.get("evaluation") or {},
         "reflection": revised_payload.get("reflection") or {},
     }
+
+
+def _choose_review_outcome(
+    *,
+    initial_payload: Dict[str, Any],
+    revised_payload: Dict[str, Any],
+) -> tuple[Dict[str, Any], bool, str]:
+    initial_scores = _evaluation_scores(initial_payload)
+    revised_scores = _evaluation_scores(revised_payload)
+
+    if revised_scores["groundedness"] > initial_scores["groundedness"] and revised_scores["overall"] >= initial_scores["overall"] - 1:
+        return revised_payload, True, "groundedness improved without materially hurting overall"
+    if revised_scores["overall"] > initial_scores["overall"]:
+        return revised_payload, True, "overall score improved"
+    if revised_scores["overall"] == initial_scores["overall"] and revised_scores["learner_fit"] > initial_scores["learner_fit"]:
+        return revised_payload, True, "learner fit improved at equal overall"
+    return initial_payload, False, "review candidate rejected because score policy did not improve enough"
 
 
 def _select_review_strategy(final_payload: Dict[str, Any], reflection: Dict[str, Any]) -> str:
@@ -191,6 +222,21 @@ def run_pipeline(
                 rag_diagnostics=current_rag_payload.get("diagnostics", {}),
                 cycle_label=f"review_{round_index}",
             )
+        selected_final_payload, accepted, decision_reason = _choose_review_outcome(
+            initial_payload=current_final,
+            revised_payload=revised_result.get("final_json", {}) or {},
+        )
+        if accepted:
+            selected_result = revised_result
+        else:
+            selected_result = {
+                **current_result,
+                "final_json": {
+                    **current_final,
+                    "review_rejected_candidate": revised_result.get("final_json", {}) or {},
+                },
+                "status": revised_result.get("status", current_result.get("status", "completed")),
+            }
         review_cycles.append(
             _build_review_cycle_summary(
                 round_index=round_index,
@@ -206,10 +252,16 @@ def run_pipeline(
                 initial_payload=current_final,
                 revised_payload=revised_result.get("final_json", {}) or {},
                 diagnostics=current_rag_payload.get("diagnostics", {}),
+                accepted=accepted,
+                decision_reason=decision_reason,
             )
         )
         current_result = {
-            **revised_result,
+            **selected_result,
+            "final_json": {
+                **selected_final_payload,
+                **({"review_rejected_candidate": revised_result.get("final_json", {}) or {}} if not accepted else {}),
+            },
             "model_trace": [*(current_result.get("model_trace", []) or []), *(revised_result.get("model_trace", []) or [])],
         }
         initial_top_k = next_top_k
@@ -229,12 +281,13 @@ def run_pipeline(
         planner_payload["retrieval_diagnostics"] = rag_diagnostics
         final_payload["retrieval_diagnostics"] = rag_diagnostics
     if review_cycles:
+        selected_scores = _evaluation_scores(final_payload)
         final_payload["review_summary"] = {
             "executed_rounds": len(review_cycles),
             "cycles": review_cycles,
             "initial_overall_score": review_cycles[0].get("initial_overall_score"),
-            "final_overall_score": review_cycles[-1].get("revised_overall_score"),
-            "pending_multimodal_review": bool(review_cycles[-1].get("trigger", {}).get("should_add_multimodal_review")),
+            "final_overall_score": selected_scores.get("overall", 0),
+            "pending_multimodal_review": bool((final_payload.get("reflection") or {}).get("should_add_multimodal_review")),
         }
 
     job.planner_json = planner_payload

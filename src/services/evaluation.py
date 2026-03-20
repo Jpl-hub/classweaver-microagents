@@ -83,6 +83,7 @@ class ReviewCaseResult:
     learner_fit_delta: float
     pending_multimodal_review: bool
     strategy: str
+    accepted: bool
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -100,6 +101,7 @@ class ReviewCaseResult:
             "learner_fit_delta": self.learner_fit_delta,
             "pending_multimodal_review": self.pending_multimodal_review,
             "strategy": self.strategy,
+            "accepted": self.accepted,
         }
 
 
@@ -221,6 +223,7 @@ def evaluate_review_cases(
                 learner_fit_delta=round(final_learner_fit - initial_learner_fit, 4),
                 pending_multimodal_review=bool(review_summary.get("pending_multimodal_review", False)),
                 strategy=str(first_cycle.get("strategy", "")),
+                accepted=bool(first_cycle.get("accepted", False)),
             )
         )
 
@@ -237,6 +240,7 @@ def evaluate_review_cases(
                 "avg_groundedness_delta": 0.0,
                 "avg_learner_fit_delta": 0.0,
                 "pending_multimodal_review_rate": 0.0,
+                "review_accept_rate": 0.0,
             },
             "cases": [],
         }
@@ -254,6 +258,7 @@ def evaluate_review_cases(
             "pending_multimodal_review_rate": round(
                 sum(1 for item in case_results if item.pending_multimodal_review) / total, 4
             ),
+            "review_accept_rate": round(sum(1 for item in case_results if item.accepted) / total, 4),
         },
         "cases": [item.to_dict() for item in case_results],
     }

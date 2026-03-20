@@ -53,6 +53,7 @@ python manage.py compare_benchmark_reports --baseline reports/dense.json --candi
 - `avg_score_delta`: review 前后 overall 平均变化
 - `avg_groundedness_delta`: review 前后 groundedness 平均变化
 - `avg_learner_fit_delta`: review 前后 learner_fit 平均变化
+- `review_accept_rate`: 执行过 review 的案例里，有多少最终被采纳
 
 ## 建议使用方式
 
