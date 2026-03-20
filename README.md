@@ -19,9 +19,9 @@
 
 **后端**
 ```bash
-python -m venv .venv
+py -3.11 -m venv .venv
 . .venv/Scripts/activate        # Windows
-pip install -r requirements.txt # 含 mysqlclient
+pip install -r requirements.txt -r requirements-dev.txt
 cp .env.example .env            # 配置 MySQL / API_KEY / 模型
 python manage.py makemigrations core
 python manage.py migrate
@@ -50,6 +50,11 @@ npm run build          # 部署使用
 ## 测试
 后端：`pytest -q`（默认内存 SQLite；如需真实库请设置 `DATABASE_URL`）。  
 前端：`npm run build` 验证构建。
+
+## 工程基线
+- 推荐 Python `3.11` 与 Node `20`
+- 开发依赖见 `requirements-dev.txt`
+- GitHub Actions 会在 `main` 和 `codex/**` 分支上执行后端测试与前端构建
 
 ## 状态
 V3，默认 MySQL + FAISS。本仓库不包含模型与索引文件，请自行配置 API_KEY 与模型名称。
