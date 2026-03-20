@@ -33,6 +33,47 @@ export interface RetrievalDiagnostics {
   source_counts?: Record<string, number>;
 }
 
+export interface EvaluationScores {
+  groundedness: number;
+  citation_coverage: number;
+  quiz_quality: number;
+  tutoring_value: number;
+  learner_fit: number;
+  overall: number;
+}
+
+export interface EvaluationRuleMetrics {
+  counts?: Record<string, number>;
+  ratios?: Record<string, number>;
+  retrieval?: Record<string, unknown>;
+  scorecard?: Partial<EvaluationScores>;
+  gates?: Record<string, boolean>;
+}
+
+export interface LearnerExperienceInsights {
+  smoothness?: string;
+  cognitive_load?: string;
+  personalization?: string;
+}
+
+export interface ReflectionInsights {
+  diagnosis?: string[];
+  next_actions?: string[];
+  should_regenerate?: boolean;
+  should_expand_retrieval?: boolean;
+  should_add_multimodal_review?: boolean;
+}
+
+export interface QualityEvaluation {
+  verdict?: "pass" | "review" | "block" | string;
+  scores?: Partial<EvaluationScores>;
+  rule_metrics?: EvaluationRuleMetrics;
+  strengths?: string[];
+  risks?: string[];
+  missing_evidence?: string[];
+  learner_experience?: LearnerExperienceInsights;
+}
+
 export interface KnowledgePoint {
   id?: string;
   title?: string;
@@ -87,6 +128,8 @@ export interface PrestudyResponse {
   printable?: PrintablePayload;
   lesson_plan?: LessonPlanSummary;
   retrieval_diagnostics?: RetrievalDiagnostics;
+  evaluation?: QualityEvaluation;
+  reflection?: ReflectionInsights;
 }
 
 export interface PrestudyJobTicket {

@@ -14,6 +14,7 @@ def orchestrate_pipeline(
     planner_module,
     rewriter_module,
     tutor_module,
+    evaluator_module,
     text: str,
     rag_chunks: List[Dict[str, Any]],
     rag_diagnostics: Dict[str, Any],
@@ -24,6 +25,7 @@ def orchestrate_pipeline(
     planner_payload: Dict[str, Any]
     final_payload: Dict[str, Any]
     tutor_payload: Dict[str, Any]
+    evaluator_payload: Dict[str, Any]
     rag_snapshot = {"enabled": bool(rag_chunks), "backend": settings.get("vector_backend"), **(rag_diagnostics or {})}
 
     try:
@@ -82,12 +84,39 @@ def orchestrate_pipeline(
                 "rag": rag_snapshot,
             }
         )
+
+        start = time.perf_counter()
+        evaluator_payload = evaluator_module.build_quality_report(
+            client=client,
+            text=text,
+            planner_payload=planner_payload,
+            final_payload=final_payload,
+            tutor_payload=tutor_payload,
+            rag_chunks=rag_chunks,
+            rag_diagnostics=rag_diagnostics,
+        )
+        evaluator_latency = int((time.perf_counter() - start) * 1000)
+        trace.append(
+            {
+                "orchestrator": "pipeline",
+                "step": "evaluator",
+                "provider": "qwen",
+                "model": settings["qwen_model"],
+                "base_url": settings["base_url"],
+                "latency_ms": evaluator_latency,
+                "input_chars": len(str(final_payload)) + len(str(tutor_payload)),
+                "output_chars": len(str(evaluator_payload)),
+                "rag": rag_snapshot,
+            }
+        )
     except AgentInvocationError as exc:
         logger.error("Agent invocation error: %s", exc)
         raise
 
     combined_final = final_payload.copy()
     combined_final.setdefault("tutor", tutor_payload)
+    combined_final["evaluation"] = evaluator_payload.get("evaluation", {})
+    combined_final["reflection"] = evaluator_payload.get("reflection", {})
 
     return {
         "planner_json": planner_payload,

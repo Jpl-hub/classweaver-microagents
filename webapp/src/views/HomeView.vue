@@ -380,6 +380,7 @@
           </div>
         </article>
         <RetrievalDiagnosticsCard v-if="job" :diagnostics="retrievalDiagnostics" />
+        <EvaluationInsightsCard v-if="job" :evaluation="evaluationInsights" :reflection="reflectionInsights" />
         <TracePanel v-if="job" :items="modelTraceItems" />
       </div>
     </section>
@@ -490,6 +491,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { useRouter } from "vue-router";
+import EvaluationInsightsCard from "../components/EvaluationInsightsCard.vue";
 import RetrievalDiagnosticsCard from "../components/RetrievalDiagnosticsCard.vue";
 import TracePanel from "../components/TracePanel.vue";
 import {
@@ -644,6 +646,12 @@ const practiceCount = computed(() => {
 });
 const knowledgeModalPoints = computed(() => toArray(job.value?.final_json?.knowledge_points));
 const modelTraceItems = computed(() => (Array.isArray(job.value?.model_trace) ? job.value.model_trace : []));
+const evaluationInsights = computed(
+  () => ((job.value?.final_json?.evaluation as Record<string, unknown> | null | undefined) ?? null),
+);
+const reflectionInsights = computed(
+  () => ((job.value?.final_json?.reflection as Record<string, unknown> | null | undefined) ?? null),
+);
 const retrievalDiagnostics = computed(
   () =>
     job.value?.retrieval_diagnostics ??

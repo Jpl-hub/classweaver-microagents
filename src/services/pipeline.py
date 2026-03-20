@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 from django.conf import settings
 from django.utils import timezone
 
-from src.agents import planner, rewriter, runtime, tutor
+from src.agents import evaluator, planner, rewriter, runtime, tutor
 from src.agents.utils import build_client
 from src.core.models import LessonEvent, LessonPlan, LlmCallLog, PrestudyJob
 from src.kb import retrieve
@@ -73,6 +73,7 @@ def run_pipeline(
         planner_module=planner,
         rewriter_module=rewriter,
         tutor_module=tutor,
+        evaluator_module=evaluator,
         text=extracted_text,
         rag_chunks=rag_chunks,
         settings=agent_settings,

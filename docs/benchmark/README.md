@@ -60,3 +60,7 @@ python manage.py compare_benchmark_reports --baseline reports/dense.json --candi
 - `true` 时启用 dense 向量召回 + lexical 召回 + RRF 融合
 - `RERANK_ENABLED=true` 时启用轻量 query-aware rerank
 - 建议分别运行 pure dense / hybrid / hybrid+rereank 三组评测报告，直接比较指标差异
+
+## 进一步阅读
+
+- [2026评测与反思设计.md](D:/code/classweaver-microagents/docs/benchmark/2026评测与反思设计.md)

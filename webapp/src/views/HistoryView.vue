@@ -55,12 +55,14 @@
       </div>
     </article>
     <RetrievalDiagnosticsCard v-if="jobDetail" :diagnostics="jobDiagnostics" />
+    <EvaluationInsightsCard v-if="jobDetail" :evaluation="jobEvaluation" :reflection="jobReflection" />
     <TracePanel v-if="jobDetail" :items="jobTrace" />
   </section>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
+import EvaluationInsightsCard from "../components/EvaluationInsightsCard.vue";
 import RetrievalDiagnosticsCard from "../components/RetrievalDiagnosticsCard.vue";
 import TracePanel from "../components/TracePanel.vue";
 import type { PrestudyJobTicket, PrestudyResponse } from "../types";
@@ -112,6 +114,12 @@ const jobDetail = computed(() => {
 });
 
 const jobTrace = computed(() => (Array.isArray(jobDetail.value?.model_trace) ? jobDetail.value.model_trace : []));
+const jobEvaluation = computed(
+  () => ((jobDetail.value?.final_json?.evaluation as Record<string, unknown> | null | undefined) ?? null),
+);
+const jobReflection = computed(
+  () => ((jobDetail.value?.final_json?.reflection as Record<string, unknown> | null | undefined) ?? null),
+);
 const jobDiagnostics = computed(
   () =>
     jobDetail.value?.retrieval_diagnostics ??
