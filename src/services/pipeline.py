@@ -83,6 +83,7 @@ def _build_review_cycle_summary(
         "revised_overall_score": revised_score,
         "score_delta": revised_score - initial_score,
         "retrieval_diagnostics": diagnostics,
+        "initial_evaluation": initial_payload.get("evaluation") or {},
         "evaluation": revised_payload.get("evaluation") or {},
         "reflection": revised_payload.get("reflection") or {},
     }

@@ -30,6 +30,10 @@ python manage.py evaluate_qa_citations --base-id 1 --dataset docs/benchmark/qa_c
 ```
 
 ```bash
+python manage.py evaluate_review_cycles --base-id 1 --dataset docs/benchmark/review_eval.sample.json --output reports/review-on.json
+```
+
+```bash
 python manage.py compare_benchmark_reports --baseline reports/dense.json --candidate reports/hybrid.json
 ```
 
@@ -44,6 +48,11 @@ python manage.py compare_benchmark_reports --baseline reports/dense.json --candi
 - `avg_valid_marker_rate`: 回答中 citation 标记是否落在有效引用范围内
 - `avg_citation_recall`: QA 返回 citations 对标准引用集合的平均召回率
 - `avg_citation_precision`: QA 返回 citations 中正确引用的平均占比
+- `review_trigger_rate`: 有多少案例触发了 review
+- `review_execution_rate`: 有多少案例真的执行了 review cycle
+- `avg_score_delta`: review 前后 overall 平均变化
+- `avg_groundedness_delta`: review 前后 groundedness 平均变化
+- `avg_learner_fit_delta`: review 前后 learner_fit 平均变化
 
 ## 建议使用方式
 
@@ -52,6 +61,7 @@ python manage.py compare_benchmark_reports --baseline reports/dense.json --candi
 - 将报告保存在 `reports/` 或单独的 benchmark 目录，逐步形成版本对比
 - 新版报告会自动记录 `vector_backend / hybrid_retrieval / rerank_enabled / embedding_model`
 - 可用 `compare_benchmark_reports` 直接对比两份 JSON 报告的 summary 指标差异
+- 可先跑一份 `REVIEW_ENABLED=false` 的 review 报告，再跑一份 `REVIEW_ENABLED=true` 的报告，直接比较反思是否带来稳定提升
 
 ## 当前实验开关
 

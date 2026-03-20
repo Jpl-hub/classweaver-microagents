@@ -67,6 +67,42 @@ class CitationCaseResult:
         }
 
 
+@dataclass
+class ReviewCaseResult:
+    lesson_request: str
+    triggered_review: bool
+    executed_rounds: int
+    initial_overall_score: float
+    final_overall_score: float
+    score_delta: float
+    initial_groundedness: float
+    final_groundedness: float
+    groundedness_delta: float
+    initial_learner_fit: float
+    final_learner_fit: float
+    learner_fit_delta: float
+    pending_multimodal_review: bool
+    strategy: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "lesson_request": self.lesson_request,
+            "triggered_review": self.triggered_review,
+            "executed_rounds": self.executed_rounds,
+            "initial_overall_score": self.initial_overall_score,
+            "final_overall_score": self.final_overall_score,
+            "score_delta": self.score_delta,
+            "initial_groundedness": self.initial_groundedness,
+            "final_groundedness": self.final_groundedness,
+            "groundedness_delta": self.groundedness_delta,
+            "initial_learner_fit": self.initial_learner_fit,
+            "final_learner_fit": self.final_learner_fit,
+            "learner_fit_delta": self.learner_fit_delta,
+            "pending_multimodal_review": self.pending_multimodal_review,
+            "strategy": self.strategy,
+        }
+
+
 def evaluate_retrieval_cases(
     *,
     cases: Iterable[Dict[str, Any]],
@@ -135,6 +171,89 @@ def evaluate_retrieval_cases(
             "mrr": round(mrr, 4),
             "avg_recall_at_k": round(avg_recall, 4),
             "avg_precision_at_k": round(avg_precision, 4),
+        },
+        "cases": [item.to_dict() for item in case_results],
+    }
+
+
+def evaluate_review_cases(
+    *,
+    cases: Iterable[Dict[str, Any]],
+    review_fn: Callable[[str], Dict[str, Any]],
+) -> Dict[str, Any]:
+    case_results: List[ReviewCaseResult] = []
+
+    for raw_case in cases:
+        lesson_request = str(raw_case.get("text", raw_case.get("query", ""))).strip()
+        if not lesson_request:
+            continue
+
+        payload = review_fn(lesson_request)
+        final_json = payload.get("final_json") or {}
+        evaluation = final_json.get("evaluation") or {}
+        review_summary = final_json.get("review_summary") or {}
+        cycles = review_summary.get("cycles") or []
+        first_cycle = cycles[0] if cycles else {}
+
+        initial_scores = (first_cycle.get("initial_evaluation") or {}).get("scores") or {}
+        final_scores = evaluation.get("scores") or {}
+
+        initial_overall = float(review_summary.get("initial_overall_score", final_scores.get("overall", 0)) or 0)
+        final_overall = float(review_summary.get("final_overall_score", final_scores.get("overall", 0)) or 0)
+        initial_groundedness = float(initial_scores.get("groundedness", final_scores.get("groundedness", 0)) or 0)
+        final_groundedness = float(final_scores.get("groundedness", 0) or 0)
+        initial_learner_fit = float(initial_scores.get("learner_fit", final_scores.get("learner_fit", 0)) or 0)
+        final_learner_fit = float(final_scores.get("learner_fit", 0) or 0)
+
+        case_results.append(
+            ReviewCaseResult(
+                lesson_request=lesson_request,
+                triggered_review=bool(review_summary),
+                executed_rounds=int(review_summary.get("executed_rounds", 0) or 0),
+                initial_overall_score=initial_overall,
+                final_overall_score=final_overall,
+                score_delta=round(final_overall - initial_overall, 4),
+                initial_groundedness=initial_groundedness,
+                final_groundedness=final_groundedness,
+                groundedness_delta=round(final_groundedness - initial_groundedness, 4),
+                initial_learner_fit=initial_learner_fit,
+                final_learner_fit=final_learner_fit,
+                learner_fit_delta=round(final_learner_fit - initial_learner_fit, 4),
+                pending_multimodal_review=bool(review_summary.get("pending_multimodal_review", False)),
+                strategy=str(first_cycle.get("strategy", "")),
+            )
+        )
+
+    total = len(case_results)
+    if total == 0:
+        return {
+            "summary": {
+                "cases": 0,
+                "review_trigger_rate": 0.0,
+                "review_execution_rate": 0.0,
+                "avg_initial_overall": 0.0,
+                "avg_final_overall": 0.0,
+                "avg_score_delta": 0.0,
+                "avg_groundedness_delta": 0.0,
+                "avg_learner_fit_delta": 0.0,
+                "pending_multimodal_review_rate": 0.0,
+            },
+            "cases": [],
+        }
+
+    return {
+        "summary": {
+            "cases": total,
+            "review_trigger_rate": round(sum(1 for item in case_results if item.triggered_review) / total, 4),
+            "review_execution_rate": round(sum(1 for item in case_results if item.executed_rounds > 0) / total, 4),
+            "avg_initial_overall": round(sum(item.initial_overall_score for item in case_results) / total, 4),
+            "avg_final_overall": round(sum(item.final_overall_score for item in case_results) / total, 4),
+            "avg_score_delta": round(sum(item.score_delta for item in case_results) / total, 4),
+            "avg_groundedness_delta": round(sum(item.groundedness_delta for item in case_results) / total, 4),
+            "avg_learner_fit_delta": round(sum(item.learner_fit_delta for item in case_results) / total, 4),
+            "pending_multimodal_review_rate": round(
+                sum(1 for item in case_results if item.pending_multimodal_review) / total, 4
+            ),
         },
         "cases": [item.to_dict() for item in case_results],
     }
