@@ -67,6 +67,12 @@ export interface ReflectionInsights {
 
 export interface ReviewCycleSummary {
   round: number;
+  strategy?: string;
+  query_text?: string;
+  query_rewrite?: {
+    query?: string;
+    rationale?: string;
+  };
   top_k: number;
   trigger?: Record<string, boolean>;
   initial_overall_score?: number;

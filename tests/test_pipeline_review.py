@@ -33,6 +33,11 @@ def test_run_pipeline_executes_transparent_review_cycle(monkeypatch):
         }
 
     monkeypatch.setattr(pipeline, "_collect_rag_context", fake_collect_rag_context)
+    monkeypatch.setattr(
+        pipeline.query_rewriter,
+        "rewrite_review_query",
+        lambda **kwargs: {"query": "牛顿三定律 惯性 受力 平衡 典型误区", "rationale": "补足受力和平衡相关证据"},
+    )
 
     call_log = []
 
@@ -85,9 +90,92 @@ def test_run_pipeline_executes_transparent_review_cycle(monkeypatch):
     assert review_summary["initial_overall_score"] == 61
     assert review_summary["final_overall_score"] == 79
     assert review_summary["pending_multimodal_review"] is True
+    assert review_summary["cycles"][0]["strategy"] == "full_pipeline"
+    assert review_summary["cycles"][0]["query_text"] == "牛顿三定律 惯性 受力 平衡 典型误区"
+    assert review_summary["cycles"][0]["query_rewrite"]["rationale"] == "补足受力和平衡相关证据"
     assert review_summary["cycles"][0]["top_k"] == 10
     assert review_summary["cycles"][0]["score_delta"] == 18
     assert call_log == [
         {"cycle": "initial", "search_k": 5},
         {"cycle": "review_1", "search_k": 10},
     ]
+
+
+@pytest.mark.django_db
+def test_run_pipeline_uses_tutor_only_review_for_practice_gap(monkeypatch):
+    user = User.objects.create_user(username="practice-reviewer", password="secret123")
+    base = KnowledgeBase.objects.create(user=user, name="Physics 2")
+    job = PrestudyJob.objects.create(user=user, knowledge_base=base, source_type="text", source_excerpt="", status="queued")
+
+    monkeypatch.setattr(pipeline, "build_client", lambda settings_map: object())
+    monkeypatch.setattr(
+        pipeline,
+        "_collect_rag_context",
+        lambda **kwargs: {
+            "results": [{"text": "chunk", "refs": [{"doc_id": "doc-1", "chunk_id": "c1"}], "title": "sample"}],
+            "diagnostics": {"enabled": True, "backend": "pgvector", "search_k": 5, "final_hits": 2},
+        },
+    )
+
+    monkeypatch.setattr(
+        pipeline.runtime,
+        "orchestrate_pipeline",
+        lambda **kwargs: {
+            "planner_json": {"title": "牛顿第二定律"},
+            "final_json": {
+                "title": "牛顿第二定律",
+                "knowledge_points": [],
+                "quiz": {"items": []},
+                "evaluation": {
+                    "scores": {"overall": 63},
+                    "verdict": "review",
+                    "rule_metrics": {
+                        "gates": {
+                            "needs_more_practice": True,
+                            "needs_more_references": False,
+                        }
+                    },
+                },
+                "reflection": {
+                    "diagnosis": ["练习层偏薄"],
+                    "next_actions": ["补一轮按错因练习"],
+                    "should_regenerate": True,
+                    "should_expand_retrieval": False,
+                    "should_add_multimodal_review": False,
+                },
+            },
+            "model_trace": [{"step": "evaluator", "cycle": "initial"}],
+            "status": "completed",
+        },
+    )
+
+    tutor_only_calls = []
+
+    monkeypatch.setattr(
+        pipeline.runtime,
+        "run_tutor_evaluation_cycle",
+        lambda **kwargs: tutor_only_calls.append(kwargs["cycle_label"]) or {
+            "planner_json": {"title": "牛顿第二定律"},
+            "final_json": {
+                "title": "牛顿第二定律",
+                "knowledge_points": [],
+                "quiz": {"items": []},
+                "evaluation": {"scores": {"overall": 76}, "verdict": "pass"},
+                "reflection": {
+                    "diagnosis": ["练习层已补齐"],
+                    "next_actions": ["继续补个性化推荐"],
+                    "should_regenerate": False,
+                    "should_expand_retrieval": False,
+                    "should_add_multimodal_review": False,
+                },
+            },
+            "model_trace": [{"step": "evaluator", "cycle": "review_1_tutor"}],
+            "status": "completed",
+        },
+    )
+
+    response = pipeline.run_pipeline(job=job, text="请生成一节牛顿第二定律预习课")
+    review_summary = response["final_json"]["review_summary"]
+    assert review_summary["executed_rounds"] == 1
+    assert review_summary["cycles"][0]["strategy"] == "tutor_only"
+    assert tutor_only_calls == ["review_1_tutor"]

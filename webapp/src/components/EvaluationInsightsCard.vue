@@ -120,8 +120,14 @@
         </div>
         <ul class="mt-3 space-y-2 text-sm text-slate-700">
           <li v-for="cycle in reviewSummary.cycles || []" :key="cycle.round" class="rounded-2xl border border-white/80 bg-white/80 px-3 py-2">
-            第 {{ cycle.round }} 轮：top_k {{ cycle.top_k }}，分数 {{ cycle.initial_overall_score ?? 0 }} -> {{ cycle.revised_overall_score ?? 0 }}
+            第 {{ cycle.round }} 轮：{{ strategyLabel(cycle.strategy) }}，top_k {{ cycle.top_k }}，分数 {{ cycle.initial_overall_score ?? 0 }} -> {{ cycle.revised_overall_score ?? 0 }}
             <span v-if="typeof cycle.score_delta === 'number'">（{{ cycle.score_delta >= 0 ? "+" : "" }}{{ cycle.score_delta }}）</span>
+            <div v-if="cycle.query_text" class="mt-1 text-xs text-slate-500">
+              query: {{ cycle.query_text }}
+            </div>
+            <div v-if="cycle.query_rewrite?.rationale" class="mt-1 text-xs text-slate-500">
+              rewrite: {{ cycle.query_rewrite.rationale }}
+            </div>
           </li>
         </ul>
       </article>
@@ -203,4 +209,10 @@ const reflectionList = computed(() => {
 });
 
 const reviewSummary = computed(() => props.reviewSummary ?? null);
+
+function strategyLabel(value?: string) {
+  if (value === "tutor_only") return "定向补练习";
+  if (value === "full_pipeline") return "全链路复核";
+  return value || "复核";
+}
 </script>

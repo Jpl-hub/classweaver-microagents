@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 from django.conf import settings
 from django.utils import timezone
 
-from src.agents import evaluator, planner, rewriter, runtime, tutor
+from src.agents import evaluator, planner, query_rewriter, rewriter, runtime, tutor
 from src.agents.utils import build_client
 from src.core.models import LessonEvent, LessonPlan, LlmCallLog, PrestudyJob
 from src.kb import retrieve
@@ -62,6 +62,9 @@ def _build_review_cycle_summary(
     *,
     round_index: int,
     trigger: Dict[str, Any],
+    strategy: str,
+    query_text: str,
+    query_rewrite: Dict[str, Any] | None,
     top_k: int,
     initial_payload: Dict[str, Any],
     revised_payload: Dict[str, Any],
@@ -71,6 +74,9 @@ def _build_review_cycle_summary(
     revised_score = _score_of(revised_payload)
     return {
         "round": round_index,
+        "strategy": strategy,
+        "query_text": query_text,
+        "query_rewrite": query_rewrite or {},
         "top_k": top_k,
         "trigger": trigger,
         "initial_overall_score": initial_score,
@@ -80,6 +86,16 @@ def _build_review_cycle_summary(
         "evaluation": revised_payload.get("evaluation") or {},
         "reflection": revised_payload.get("reflection") or {},
     }
+
+
+def _select_review_strategy(final_payload: Dict[str, Any], reflection: Dict[str, Any]) -> str:
+    if reflection.get("should_expand_retrieval"):
+        return "full_pipeline"
+    rule_metrics = (final_payload.get("evaluation") or {}).get("rule_metrics") or {}
+    gates = rule_metrics.get("gates") or {}
+    if gates.get("needs_more_practice") and not gates.get("needs_more_references"):
+        return "tutor_only"
+    return "full_pipeline"
 
 
 def run_pipeline(
@@ -134,22 +150,46 @@ def run_pipeline(
         if not _should_run_review_cycle(final_payload=current_final, settings_map=agent_settings, round_index=round_index - 1):
             break
         reflection = current_final.get("reflection") or {}
+        strategy = _select_review_strategy(current_final, reflection)
         next_top_k = initial_top_k
+        review_query_text = extracted_text
+        query_rewrite_payload: Dict[str, Any] | None = None
         if reflection.get("should_expand_retrieval"):
             next_top_k = min(12, max(initial_top_k + 2, initial_top_k * review_multiplier))
-        current_rag_payload = _collect_rag_context(job=job, text=extracted_text, top_k=next_top_k)
-        revised_result = runtime.orchestrate_pipeline(
-            client=client,
-            planner_module=planner,
-            rewriter_module=rewriter,
-            tutor_module=tutor,
-            evaluator_module=evaluator,
-            text=extracted_text,
-            rag_chunks=current_rag_payload.get("results", []),
-            settings=agent_settings,
-            rag_diagnostics=current_rag_payload.get("diagnostics", {}),
-            cycle_label=f"review_{round_index}",
-        )
+            query_rewrite_payload = query_rewriter.rewrite_review_query(
+                client=client,
+                text=extracted_text,
+                evaluation=current_final.get("evaluation") or {},
+                reflection=reflection,
+            )
+            review_query_text = query_rewrite_payload.get("query") or extracted_text
+            current_rag_payload = _collect_rag_context(job=job, text=review_query_text, top_k=next_top_k)
+        if strategy == "tutor_only":
+            revised_result = runtime.run_tutor_evaluation_cycle(
+                client=client,
+                tutor_module=tutor,
+                evaluator_module=evaluator,
+                text=extracted_text,
+                planner_payload=current_result.get("planner_json", {}) or {},
+                final_payload=current_final,
+                rag_chunks=current_rag_payload.get("results", []),
+                rag_diagnostics=current_rag_payload.get("diagnostics", {}),
+                settings=agent_settings,
+                cycle_label=f"review_{round_index}_tutor",
+            )
+        else:
+            revised_result = runtime.orchestrate_pipeline(
+                client=client,
+                planner_module=planner,
+                rewriter_module=rewriter,
+                tutor_module=tutor,
+                evaluator_module=evaluator,
+                text=extracted_text,
+                rag_chunks=current_rag_payload.get("results", []),
+                settings=agent_settings,
+                rag_diagnostics=current_rag_payload.get("diagnostics", {}),
+                cycle_label=f"review_{round_index}",
+            )
         review_cycles.append(
             _build_review_cycle_summary(
                 round_index=round_index,
@@ -158,6 +198,9 @@ def run_pipeline(
                     "should_regenerate": bool(reflection.get("should_regenerate")),
                     "should_add_multimodal_review": bool(reflection.get("should_add_multimodal_review")),
                 },
+                strategy=strategy,
+                query_text=review_query_text,
+                query_rewrite=query_rewrite_payload,
                 top_k=next_top_k,
                 initial_payload=current_final,
                 revised_payload=revised_result.get("final_json", {}) or {},
