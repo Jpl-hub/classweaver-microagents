@@ -14,6 +14,15 @@ class TimestampedModel(models.Model):
 
 
 class PrestudyJob(TimestampedModel):
+    STATUS_CHOICES = [
+        ("pending", "Pending"),
+        ("queued", "Queued"),
+        ("processing", "Processing"),
+        ("completed", "Completed"),
+        ("completed_with_fallback", "Completed With Fallback"),
+        ("failed", "Failed"),
+    ]
+
     SOURCE_CHOICES = [
         ("text", "Text"),
         ("ppt", "PowerPoint"),
@@ -37,9 +46,15 @@ class PrestudyJob(TimestampedModel):
     source_excerpt = models.TextField(blank=True)
     planner_json = models.JSONField(default=dict, blank=True)
     final_json = models.JSONField(default=dict, blank=True)
-    status = models.CharField(max_length=32, default="pending")
+    status = models.CharField(max_length=32, choices=STATUS_CHOICES, default="pending")
     duration_ms = models.PositiveIntegerField(default=0)
-    model_trace = models.JSONField(default=dict, blank=True)
+    model_trace = models.JSONField(default=list, blank=True)
+    task_id = models.CharField(max_length=255, blank=True)
+    attempts = models.PositiveIntegerField(default=0)
+    queued_at = models.DateTimeField(null=True, blank=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    error_message = models.TextField(blank=True)
 
     def __str__(self) -> str:
         return f"PrestudyJob#{self.pk}"

@@ -237,6 +237,9 @@ class PrestudyDetailView(APIView):
             "final_json": job.final_json or {},
             "model_trace": job.model_trace or {},
             "duration_ms": job.duration_ms,
+            "task_id": job.task_id,
+            "attempts": job.attempts,
+            "error_message": job.error_message,
         }
         printable_payload = printable_service.build_printable_payload(base_payload["final_json"])
         base_payload["printable"] = printable_payload
@@ -264,7 +267,7 @@ class PrestudyJobStatusView(APIView):
         elif job.status == "processing":
             detail = "正在调用模型 ..."
         elif job.status == "failed":
-            detail = "任务失败，请查看日志或重试"
+            detail = job.error_message or "任务失败，请查看日志或重试"
         serializer = PrestudyJobStatusSerializer(
             {
                 "id": str(job.pk),

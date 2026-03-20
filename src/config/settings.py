@@ -63,25 +63,20 @@ if DATABASE_URL:
         "default": dj_database_url.parse(DATABASE_URL, conn_max_age=600, conn_health_checks=True),
     }
 else:
-    MYSQL_NAME = os.getenv("MYSQL_DATABASE", "classweaver")
-    MYSQL_USER = os.getenv("MYSQL_USER", "root")
-    MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "")
-    MYSQL_HOST = os.getenv("MYSQL_HOST", "127.0.0.1")
-    MYSQL_PORT = os.getenv("MYSQL_PORT", "3306")
-    MYSQL_CHARSET = os.getenv("MYSQL_CHARSET", "utf8mb4")
+    POSTGRES_NAME = os.getenv("POSTGRES_DB", "classweaver")
+    POSTGRES_USER = os.getenv("POSTGRES_USER", "classweaver")
+    POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "classweaver")
+    POSTGRES_HOST = os.getenv("POSTGRES_HOST", "127.0.0.1")
+    POSTGRES_PORT = os.getenv("POSTGRES_PORT", "5432")
 
     DATABASES = {
         "default": {
-            "ENGINE": "django.db.backends.mysql",
-            "NAME": MYSQL_NAME,
-            "USER": MYSQL_USER,
-            "PASSWORD": MYSQL_PASSWORD,
-            "HOST": MYSQL_HOST,
-            "PORT": MYSQL_PORT,
-            "OPTIONS": {
-                "charset": MYSQL_CHARSET,
-                "init_command": f"SET SESSION sql_mode='STRICT_ALL_TABLES', NAMES {MYSQL_CHARSET}",
-            },
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": POSTGRES_NAME,
+            "USER": POSTGRES_USER,
+            "PASSWORD": POSTGRES_PASSWORD,
+            "HOST": POSTGRES_HOST,
+            "PORT": POSTGRES_PORT,
         }
     }
 
@@ -167,6 +162,11 @@ AGENT_SETTINGS: Dict[str, Any] = {
     "rag_enabled": os.getenv("RAG_ENABLED", "true").lower() in {"1", "true", "yes"},
     "agentscope_enabled": os.getenv("AGENTSCOPE_ENABLED", "false").lower() in {"1", "true", "yes"},
 }
+
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://127.0.0.1:6379/0")
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", CELERY_BROKER_URL)
+CELERY_TASK_ALWAYS_EAGER = os.getenv("CELERY_TASK_ALWAYS_EAGER", "false").lower() in {"1", "true", "yes"}
+CELERY_TASK_EAGER_PROPAGATES = True
 
 VITE_DIST_PATH = BASE_DIR / "webapp" / "dist"
 if VITE_DIST_PATH.exists():

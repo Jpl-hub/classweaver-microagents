@@ -15,17 +15,28 @@
 4) “课堂教练”按场景陪学，历史页可回顾最近任务，本地缓存可随时清理。
 
 ## 快速启动
-> 默认使用 MySQL 8+ 与本地 FAISS（索引文件已被 .gitignore 排除）。
+> 当前开发基线使用 PostgreSQL + Redis；向量检索默认仍为本地 FAISS，后续将继续收敛到 pgvector。
+
+**基础设施**
+```bash
+docker compose up -d postgres redis
+```
 
 **后端**
 ```bash
 py -3.11 -m venv .venv
 . .venv/Scripts/activate        # Windows
 pip install -r requirements.txt -r requirements-dev.txt
-cp .env.example .env            # 配置 MySQL / API_KEY / 模型
+cp .env.example .env            # 配置 PostgreSQL / Redis / API_KEY / 模型
 python manage.py makemigrations core
 python manage.py migrate
 python manage.py runserver 0.0.0.0:8000
+```
+
+**Celery Worker**
+```bash
+. .venv/Scripts/activate
+celery -A celery_app worker -l info
 ```
 
 **前端**
@@ -41,6 +52,7 @@ npm run build          # 部署使用
 - 会话：前端缓存用户信息；任意接口 401 会清空缓存并跳转登录。
 - 知识库：上传必须带 base_id，检索/问答只在当前库；FAISS 索引写入 `data/`，不会入仓库。
 - 时间线：单列滚动区，拖拽即可调整学习顺序，陪学助教可直接引用。
+- 预习任务：接口负责入队，实际执行由 Celery worker 处理。
 
 ## 文档
 - `docs/需求分析.md`：角色与需求
@@ -54,7 +66,7 @@ npm run build          # 部署使用
 ## 工程基线
 - 推荐 Python `3.11` 与 Node `20`
 - 开发依赖见 `requirements-dev.txt`
-- GitHub Actions 会在 `main` 和 `codex/**` 分支上执行后端测试与前端构建
+- GitHub Actions 会在 `main` 上执行后端测试与前端构建
 
 ## 状态
-V3，默认 MySQL + FAISS。本仓库不包含模型与索引文件，请自行配置 API_KEY 与模型名称。
+V3，当前开发基线为 PostgreSQL + Redis + FAISS。本仓库不包含模型与索引文件，请自行配置 API_KEY 与模型名称。

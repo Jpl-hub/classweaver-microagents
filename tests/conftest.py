@@ -12,6 +12,6 @@ if str(SRC_PATH) not in sys.path:
     sys.path.insert(0, str(SRC_PATH))
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
-# Use lightweight DB for unit tests; no migrations required for serializer-only tests.
-os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
+# Force a lightweight DB for tests regardless of any local .env overrides.
+os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 django.setup()

@@ -23,6 +23,9 @@ class PrestudyResponseSerializer(serializers.Serializer):
     final_json = serializers.JSONField()
     model_trace = serializers.JSONField()
     duration_ms = serializers.IntegerField()
+    task_id = serializers.CharField(required=False, allow_blank=True)
+    attempts = serializers.IntegerField(required=False)
+    error_message = serializers.CharField(required=False, allow_blank=True)
     printable = serializers.JSONField(required=False)
     lesson_plan = serializers.JSONField(required=False)
 
