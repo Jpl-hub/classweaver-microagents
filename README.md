@@ -15,7 +15,7 @@
 4) “课堂教练”按场景陪学，历史页可回顾最近任务，本地缓存可随时清理。
 
 ## 快速启动
-> 当前开发基线使用 PostgreSQL + Redis；向量检索默认仍为本地 FAISS，后续将继续收敛到 pgvector。
+> 当前开发基线使用 PostgreSQL + Redis；向量检索默认使用 pgvector，FAISS 保留为本地回退方案。
 
 **基础设施**
 ```bash
@@ -50,7 +50,7 @@ npm run build          # 部署使用
 
 ## 使用要点
 - 会话：前端缓存用户信息；任意接口 401 会清空缓存并跳转登录。
-- 知识库：上传必须带 base_id，检索/问答只在当前库；FAISS 索引写入 `data/`，不会入仓库。
+- 知识库：上传必须带 base_id，检索/问答只在当前库；默认使用 pgvector，切换到 FAISS 时索引写入 `data/` 且不会入仓库。
 - 时间线：单列滚动区，拖拽即可调整学习顺序，陪学助教可直接引用。
 - 预习任务：接口负责入队，实际执行由 Celery worker 处理。
 
@@ -69,4 +69,4 @@ npm run build          # 部署使用
 - GitHub Actions 会在 `main` 上执行后端测试与前端构建
 
 ## 状态
-V3，当前开发基线为 PostgreSQL + Redis + FAISS。本仓库不包含模型与索引文件，请自行配置 API_KEY 与模型名称。
+V3，当前开发基线为 PostgreSQL + Redis + pgvector。本仓库不包含模型与索引文件，请自行配置 API_KEY 与模型名称。

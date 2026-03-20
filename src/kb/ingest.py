@@ -171,6 +171,7 @@ def ingest_documents(*, files: Iterable[Any], base) -> Dict[str, Any]:
             defaults={
                 "text": record["text"],
                 "embedding": list(embedding),
+                "embedding_vector": list(embedding),
                 "metadata": record["metadata"],
             },
         )

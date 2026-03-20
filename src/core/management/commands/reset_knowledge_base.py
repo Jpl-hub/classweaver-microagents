@@ -9,7 +9,7 @@ from src.kb import store as kb_store
 
 
 class Command(BaseCommand):
-    help = "删除所有知识库文档、切片记录，并清空本地向量索引文件。"
+    help = "删除所有知识库文档、切片记录，并按当前后端清理向量存储。"
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -21,7 +21,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         confirm = options["yes"]
         if not confirm:
-            answer = input("该操作会永久删除所有知识库记录和向量索引，确定继续？[yes/NO]: ").strip().lower()
+            answer = input("该操作会永久删除所有知识库记录和向量存储，确定继续？[yes/NO]: ").strip().lower()
             if answer not in {"y", "yes"}:
                 self.stdout.write(self.style.WARNING("已取消重置。"))
                 return
@@ -31,18 +31,19 @@ class Command(BaseCommand):
             doc_deleted, _ = KnowledgeDocument.objects.all().delete()
 
         agent_settings = settings.AGENT_SETTINGS
-        paths = [
-            Path(agent_settings["vstore_path"]),
-            Path(agent_settings["vstore_meta"]),
-        ]
-        for path in paths:
-            if path.exists():
-                path.unlink()
+        if agent_settings["vector_backend"] == "faiss":
+            paths = [
+                Path(agent_settings["vstore_path"]),
+                Path(agent_settings["vstore_meta"]),
+            ]
+            for path in paths:
+                if path.exists():
+                    path.unlink()
 
         kb_store.clear_store_cache()
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"知识库已重置：删除文档 {doc_deleted} 条、切片 {chunk_deleted} 条，并清理向量索引文件。"
+                f"知识库已重置：删除文档 {doc_deleted} 条、切片 {chunk_deleted} 条，并清理向量存储状态。"
             )
         )

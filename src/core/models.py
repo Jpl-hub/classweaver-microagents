@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+from pgvector.django import VectorField
 
 
 class TimestampedModel(models.Model):
@@ -142,6 +143,7 @@ class KnowledgeChunk(TimestampedModel):
     chunk_id = models.CharField(max_length=64)
     text = models.TextField()
     embedding = models.JSONField(default=list, blank=True)
+    embedding_vector = VectorField(dimensions=None, null=True, blank=True)
     metadata = models.JSONField(default=dict, blank=True)
 
     class Meta:

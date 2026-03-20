@@ -156,7 +156,7 @@ AGENT_SETTINGS: Dict[str, Any] = {
     "embedding_model": os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3"),
     "request_timeout": float(os.getenv("REQUEST_TIMEOUT_SECONDS", "30")),
     "max_retries": int(os.getenv("OPENAI_MAX_RETRIES", "2")),
-    "vector_backend": os.getenv("VECTOR_BACKEND", "faiss"),
+    "vector_backend": os.getenv("VECTOR_BACKEND", "pgvector"),
     "vstore_path": os.getenv("VSTORE_PATH", "data/faiss.index"),
     "vstore_meta": os.getenv("VSTORE_META", "data/chunks.jsonl"),
     "rag_enabled": os.getenv("RAG_ENABLED", "true").lower() in {"1", "true", "yes"},

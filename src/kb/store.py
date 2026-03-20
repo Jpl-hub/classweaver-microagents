@@ -1,11 +1,14 @@
 import json
 import logging
-import os
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 import numpy as np
 from django.conf import settings
+from django.db import connection
+from pgvector.django import CosineDistance
+
+from src.core.models import KnowledgeChunk
 
 try:
     import faiss  # type: ignore
@@ -78,12 +81,31 @@ class FaissStore:
             self.meta_path.unlink()
         self._save()
 
-    def search(self, embedding: List[float], top_k: int) -> List[Tuple[float, Dict[str, Any]]]:
+    def count(self, *, base_id: int | None = None, doc_ids: List[str] | None = None) -> int:
+        if base_id is None and not doc_ids:
+            return len(self.metadata)
+        doc_id_set = set(doc_ids or [])
+        return sum(
+            1
+            for item in self.metadata
+            if (base_id is None or str(item.get("base_id")) == str(base_id))
+            and (not doc_id_set or item.get("doc_id") in doc_id_set)
+        )
+
+    def search(
+        self,
+        embedding: List[float],
+        top_k: int,
+        *,
+        base_id: int | None = None,
+        doc_ids: List[str] | None = None,
+    ) -> List[Tuple[float, Dict[str, Any]]]:
         if self.index is None or self.index.ntotal == 0:
             return []
         vector = np.array([embedding], dtype="float32")
         faiss.normalize_L2(vector)
         distances, indices = self.index.search(vector, top_k)
+        doc_id_set = set(doc_ids or [])
         results: List[Tuple[float, Dict[str, Any]]] = []
         for score, idx in zip(distances[0], indices[0], strict=False):
             if idx == -1:
@@ -91,6 +113,10 @@ class FaissStore:
             try:
                 meta = self.metadata[idx]
             except IndexError:
+                continue
+            if base_id is not None and str(meta.get("base_id")) != str(base_id):
+                continue
+            if doc_id_set and meta.get("doc_id") not in doc_id_set:
                 continue
             results.append((float(score), meta))
         return results
@@ -105,6 +131,80 @@ class FaissStore:
     def upsert_embeddings(self, *, embeddings: List[List[float]], metadata: List[Dict[str, Any]]) -> None:
         """Compatibility wrapper used by ingestion pipeline."""
         self.upsert(embeddings, metadata)
+
+
+class PgVectorStore:
+    def __init__(self) -> None:
+        self.vendor = connection.vendor
+
+    def _ensure_postgres(self) -> None:
+        if self.vendor != "postgresql":
+            raise VectorStoreError("pgvector backend requires a PostgreSQL database connection.")
+
+    def count(self, *, base_id: int | None = None, doc_ids: List[str] | None = None) -> int:
+        queryset = KnowledgeChunk.objects.select_related("document")
+        if base_id is not None:
+            queryset = queryset.filter(document__base_id=base_id)
+        if doc_ids:
+            queryset = queryset.filter(document__doc_id__in=doc_ids)
+        return queryset.exclude(embedding_vector__isnull=True).count()
+
+    def search(
+        self,
+        embedding: List[float],
+        top_k: int,
+        *,
+        base_id: int | None = None,
+        doc_ids: List[str] | None = None,
+    ) -> List[Tuple[float, Dict[str, Any]]]:
+        self._ensure_postgres()
+        queryset = KnowledgeChunk.objects.select_related("document")
+        if base_id is not None:
+            queryset = queryset.filter(document__base_id=base_id)
+        if doc_ids:
+            queryset = queryset.filter(document__doc_id__in=doc_ids)
+        queryset = queryset.exclude(embedding_vector__isnull=True)
+        queryset = queryset.annotate(distance=CosineDistance("embedding_vector", embedding)).order_by("distance")[:top_k]
+
+        results: List[Tuple[float, Dict[str, Any]]] = []
+        for chunk in queryset:
+            distance = float(getattr(chunk, "distance", 1.0) or 1.0)
+            similarity = 1.0 - distance
+            results.append(
+                (
+                    similarity,
+                    {
+                        "doc_id": chunk.document.doc_id,
+                        "chunk_id": chunk.chunk_id,
+                        "text": chunk.text,
+                        "base_id": chunk.document.base_id,
+                        "title": chunk.document.title,
+                        "metadata": chunk.metadata or {},
+                    },
+                )
+            )
+        return results
+
+    def upsert_embeddings(self, *, embeddings: List[List[float]], metadata: List[Dict[str, Any]]) -> None:
+        self._ensure_postgres()
+        if not embeddings or not metadata:
+            return
+        embedding_map = {
+            item["chunk_id"]: list(vector)
+            for item, vector in zip(metadata, embeddings, strict=False)
+            if item.get("chunk_id")
+        }
+        if not embedding_map:
+            return
+        chunks = list(KnowledgeChunk.objects.filter(chunk_id__in=embedding_map.keys()))
+        for chunk in chunks:
+            vector = embedding_map.get(chunk.chunk_id)
+            if vector is None:
+                continue
+            chunk.embedding = vector
+            chunk.embedding_vector = vector
+        if chunks:
+            KnowledgeChunk.objects.bulk_update(chunks, ["embedding", "embedding_vector"])
 
 
 _STORE_CACHE: Dict[str, Any] = {}
@@ -125,13 +225,13 @@ def get_store(backend: str) -> Any:
     if backend == "faiss":
         return _faiss_store()
     if backend == "pgvector":
-        raise VectorStoreError("pgvector backend is not yet implemented.")
+        return PgVectorStore()
     raise VectorStoreError(f"Unsupported vector backend: {backend}")
 
 
 def upsert_embeddings(*, embeddings: List[List[float]], metadata: List[Dict[str, Any]]) -> None:
     store = get_store(settings.AGENT_SETTINGS["vector_backend"])
-    store.upsert(embeddings, metadata)
+    store.upsert_embeddings(embeddings=embeddings, metadata=metadata)
 
 
 def clear_store_cache() -> None:
