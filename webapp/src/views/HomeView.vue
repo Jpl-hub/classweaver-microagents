@@ -511,6 +511,7 @@ import {
   normalizeKnowledgeBaseList,
   resolveKnowledgeBaseName,
 } from "../utils/knowledge";
+import { toHistoryState } from "../utils/historyState";
 import {
   type ActionStatusEntry,
   type ActionStatusState,
@@ -750,6 +751,9 @@ const taskStatusSummary = computed(() => {
   if (statusMessage.value) return statusMessage.value;
   if (jobRestoreError.value) return `恢复任务时出现问题：${jobRestoreError.value}`;
   if (job.value?.status === "failed") return "任务失败，请重新发送或稍后再试。";
+  if (job.value?.status === "completed") {
+    return "课程已生成，可继续打印讲义、发起测验或进入陪学助教。";
+  }
   if (jobTicket.value) {
     const pendingAgents = agentProgress.value.filter((agent) => agent.state !== "completed").length;
     return pendingAgents
@@ -1173,7 +1177,7 @@ function openPrintable(action?: RecommendationSuggestion) {
   router.push({
     name: "print",
     query: { jobId: job.value.id },
-    state: { printable: job.value.printable },
+    state: { printable: toHistoryState(job.value.printable) },
   });
 }
 

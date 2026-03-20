@@ -8,6 +8,26 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+def _split_csv(value: str) -> List[str]:
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def _default_frontend_origins() -> List[str]:
+    origins: List[str] = []
+    for host in ("127.0.0.1", "localhost"):
+        for port in (5173, 5174, 5175):
+            origins.append(f"http://{host}:{port}")
+    return origins
+
+
+def _merge_unique(items: List[str], defaults: List[str]) -> List[str]:
+    merged: List[str] = []
+    for value in [*items, *defaults]:
+        if value not in merged:
+            merged.append(value)
+    return merged
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv("SECRET_KEY", "unsafe-secret-key")
@@ -127,25 +147,13 @@ SPECTACULAR_SETTINGS = {
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = os.getenv("CORS_ALLOW_ALL_ORIGINS", "false").lower() in {"1", "true", "yes"}
 if not CORS_ALLOW_ALL_ORIGINS:
-    frontend_origins = [
-        origin.strip()
-        for origin in os.getenv(
-            "FRONTEND_ORIGINS",
-            os.getenv("FRONTEND_ORIGIN", "http://127.0.0.1:5173"),
-        ).split(",")
-        if origin.strip()
-    ]
+    frontend_origins_env = os.getenv("FRONTEND_ORIGINS", os.getenv("FRONTEND_ORIGIN", ""))
+    frontend_origins = _merge_unique(_split_csv(frontend_origins_env), _default_frontend_origins())
     CORS_ALLOWED_ORIGINS = frontend_origins
 
 # CSRF trusted origins（用于本地前端调试）
-CSRF_TRUSTED_ORIGINS = [
-    origin.strip()
-    for origin in os.getenv(
-        "CSRF_TRUSTED_ORIGINS",
-        "http://127.0.0.1:5173,http://localhost:5173,http://127.0.0.1:5174,http://localhost:5174",
-    ).split(",")
-    if origin.strip()
-]
+csrf_trusted_origins_env = os.getenv("CSRF_TRUSTED_ORIGINS", "")
+CSRF_TRUSTED_ORIGINS = _merge_unique(_split_csv(csrf_trusted_origins_env), _default_frontend_origins())
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"

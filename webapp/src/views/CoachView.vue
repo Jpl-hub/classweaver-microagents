@@ -143,6 +143,7 @@
 import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { getLessonTimeline, getPrestudyJob, startQuiz } from "../services/api";
+import { toHistoryState } from "../utils/historyState";
 import type {
   KnowledgePoint,
   LessonTimelinePayload,
@@ -434,7 +435,7 @@ async function handleSceneAction(action?: SceneAction) {
     router.push({
       name: "print",
       query: { jobId: job.value.id },
-      state: { printable: job.value.printable },
+      state: { printable: toHistoryState(job.value.printable) },
     });
     return;
   }
