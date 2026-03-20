@@ -6,7 +6,7 @@ from django.conf import settings
 
 from src.agents.utils import build_client
 from src.kb import retrieve as kb_retrieve
-from src.services.citations import build_citations, ensure_answer_citations
+from src.services.citations import build_citations
 
 
 def answer_question(*, question: str, base, top_k: int = 4) -> Dict[str, Any]:
@@ -41,7 +41,7 @@ def answer_question(*, question: str, base, top_k: int = 4) -> Dict[str, Any]:
     )
     citations = build_citations(contexts, limit=top_k)
     return {
-        "answer": ensure_answer_citations(answer, citations),
+        "answer": answer,
         "contexts": contexts,
         "citations": citations,
         "retrieval_diagnostics": retrieval_payload.get("diagnostics", {}),
