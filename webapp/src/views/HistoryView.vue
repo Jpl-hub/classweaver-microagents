@@ -58,7 +58,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import type { PrestudyJobTicket, PrestudyResponse } from "../types";
 import { formatRelativeTime } from "../utils/knowledge";
 
@@ -124,7 +124,6 @@ function statusText(value?: string): string {
     pending: "待处理",
     processing: "进行中",
     completed: "已完成",
-    completed_with_fallback: "已完成（兜底）",
     failed: "已失败",
   };
   if (!value) return "未开始";

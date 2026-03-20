@@ -677,7 +677,7 @@ const pipelineSummary = computed(() => {
   if (job.value?.status === "failed") {
     return "任务失败，请调整输入后重试。";
   }
-  if (job.value?.status && ["completed", "completed_with_fallback"].includes(job.value.status)) {
+  if (job.value?.status === "completed") {
     return "课程已生成，可查看课程总览或学习指导。";
   }
   if (jobTicket.value && !job.value) {
@@ -689,7 +689,7 @@ const pipelineSummary = computed(() => {
 
 
 const pipelineStatusLabel = computed(() => {
-  if (job.value?.status && ["completed", "completed_with_fallback"].includes(job.value.status)) {
+  if (job.value?.status === "completed") {
     return "已完成";
   }
   if (jobTicket.value) {
@@ -832,7 +832,6 @@ function statusText(value?: string): string {
     pending: "已创建",
     processing: "执行中",
     completed: "完成",
-    completed_with_fallback: "完成（降级）",
     failed: "失败",
   };
   if (!value) return "未开始";
@@ -1112,7 +1111,7 @@ async function refreshJobStatus(jobId: string, forceDetail = false) {
     const ticket = await getPrestudyJobStatus(jobId);
     jobTicket.value = ticket;
     persistJobSnapshot(job.value ?? null);
-    if (forceDetail || ["completed", "completed_with_fallback", "failed"].includes(ticket.status)) {
+    if (forceDetail || ["completed", "failed"].includes(ticket.status)) {
       stopPolling();
       await loadJobDetail(jobId);
     }

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 from datetime import timedelta
 from time import perf_counter
 from typing import Any, Dict, List, Optional
@@ -17,8 +16,6 @@ from . import printable
 from .citations import build_citations
 from .ppt import extract_text
 
-logger = logging.getLogger(__name__)
-
 
 def _collect_rag_context(
     *,
@@ -32,20 +29,13 @@ def _collect_rag_context(
     if not job.knowledge_base_id or not job.user_id:
         return {"results": [], "diagnostics": {"enabled": False}}
 
-    try:
-        payload = retrieve.retrieve_context_with_diagnostics(
-            query=text,
-            top_k=top_k,
-            base=job.knowledge_base,
-        )
-        payload["diagnostics"]["enabled"] = True
-        return payload
-    except NotImplementedError:
-        logger.debug("RAG retrieval not implemented yet; continuing without context.")
-        return {"results": [], "diagnostics": {"enabled": False, "error": "not_implemented"}}
-    except Exception:  # noqa: BLE001
-        logger.exception("Failed to retrieve RAG context; proceeding without it.")
-        return {"results": [], "diagnostics": {"enabled": False, "error": "retrieval_failed"}}
+    payload = retrieve.retrieve_context_with_diagnostics(
+        query=text,
+        top_k=top_k,
+        base=job.knowledge_base,
+    )
+    payload["diagnostics"]["enabled"] = True
+    return payload
 
 
 def run_pipeline(

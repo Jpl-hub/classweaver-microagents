@@ -6,7 +6,6 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from . import prompts
 from .utils import parse_agent_json
-from src.services.citations import build_citations
 
 
 class TutorPracticeItem(BaseModel):
@@ -75,9 +74,4 @@ def build_tutor_response(
         validated = TutorResponse.model_validate(parsed)
     except ValidationError as exc:
         raise ValueError(f"Tutor response validation failed: {exc}") from exc
-    payload = validated.model_dump()
-    fallback_citations = build_citations(rag_chunks or [], limit=3)
-    for item in payload.get("practice", []):
-        if not item.get("citations"):
-            item["citations"] = fallback_citations
-    return payload
+    return validated.model_dump()

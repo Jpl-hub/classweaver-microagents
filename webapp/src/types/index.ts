@@ -17,7 +17,6 @@ export interface ModelTraceSegment {
   input_chars: number;
   output_chars: number;
   rag?: RetrievalDiagnostics & Record<string, unknown>;
-  fallback?: boolean;
 }
 
 export interface RetrievalDiagnostics {

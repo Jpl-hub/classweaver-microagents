@@ -20,7 +20,6 @@ class PrestudyJob(TimestampedModel):
         ("queued", "Queued"),
         ("processing", "Processing"),
         ("completed", "Completed"),
-        ("completed_with_fallback", "Completed With Fallback"),
         ("failed", "Failed"),
     ]
 

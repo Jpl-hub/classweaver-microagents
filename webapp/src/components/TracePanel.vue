@@ -27,7 +27,6 @@
         <div v-if="item.rag?.enabled && (item.rag.vector_hits || item.rag.lexical_hits || item.rag.final_hits)" class="text-xs text-slate-500">
           vector {{ item.rag.vector_hits ?? 0 }} · lexical {{ item.rag.lexical_hits ?? 0 }} · final {{ item.rag.final_hits ?? 0 }}
         </div>
-        <div v-if="item.fallback" class="text-xs font-semibold text-amber-600">已触发降级</div>
       </li>
     </ul>
     <p v-else class="text-sm text-slate-500">执行预习流程后会显示追踪数据。</p>
