@@ -84,6 +84,9 @@ class ReviewCaseResult:
     pending_multimodal_review: bool
     strategy: str
     accepted: bool
+    primary_issue: str
+    recommended_strategy: str
+    issue_tags: List[str]
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -102,6 +105,9 @@ class ReviewCaseResult:
             "pending_multimodal_review": self.pending_multimodal_review,
             "strategy": self.strategy,
             "accepted": self.accepted,
+            "primary_issue": self.primary_issue,
+            "recommended_strategy": self.recommended_strategy,
+            "issue_tags": self.issue_tags,
         }
 
 
@@ -196,6 +202,9 @@ def evaluate_review_cases(
         review_summary = final_json.get("review_summary") or {}
         cycles = review_summary.get("cycles") or []
         first_cycle = cycles[0] if cycles else {}
+        issue_tags = [str(item) for item in (evaluation.get("issue_tags") or []) if str(item).strip()]
+        primary_issue = str(evaluation.get("primary_issue") or "none")
+        recommended_strategy = str(evaluation.get("recommended_strategy") or first_cycle.get("strategy") or "")
 
         initial_scores = (first_cycle.get("initial_evaluation") or {}).get("scores") or {}
         final_scores = evaluation.get("scores") or {}
@@ -224,6 +233,9 @@ def evaluate_review_cases(
                 pending_multimodal_review=bool(review_summary.get("pending_multimodal_review", False)),
                 strategy=str(first_cycle.get("strategy", "")),
                 accepted=bool(first_cycle.get("accepted", False)),
+                primary_issue=primary_issue,
+                recommended_strategy=recommended_strategy,
+                issue_tags=issue_tags,
             )
         )
 
@@ -241,9 +253,18 @@ def evaluate_review_cases(
                 "avg_learner_fit_delta": 0.0,
                 "pending_multimodal_review_rate": 0.0,
                 "review_accept_rate": 0.0,
+                "issue_tag_rates": {},
+                "primary_issue_rates": {},
+                "recommended_strategy_rates": {},
             },
             "cases": [],
         }
+
+    issue_tag_rates = _rate_map(item for case in case_results for item in case.issue_tags)
+    primary_issue_rates = _rate_map(case.primary_issue for case in case_results if case.primary_issue)
+    recommended_strategy_rates = _rate_map(
+        case.recommended_strategy for case in case_results if case.recommended_strategy
+    )
 
     return {
         "summary": {
@@ -259,6 +280,9 @@ def evaluate_review_cases(
                 sum(1 for item in case_results if item.pending_multimodal_review) / total, 4
             ),
             "review_accept_rate": round(sum(1 for item in case_results if item.accepted) / total, 4),
+            "issue_tag_rates": issue_tag_rates,
+            "primary_issue_rates": primary_issue_rates,
+            "recommended_strategy_rates": recommended_strategy_rates,
         },
         "cases": [item.to_dict() for item in case_results],
     }
@@ -373,3 +397,17 @@ def compare_report_summaries(*, baseline: Dict[str, Any], candidate: Dict[str, A
         "candidate": candidate.get("config") or {},
         "metrics": deltas,
     }
+
+
+def _rate_map(values: Iterable[str]) -> Dict[str, float]:
+    counts: Dict[str, int] = {}
+    total = 0
+    for value in values:
+        key = str(value).strip()
+        if not key:
+            continue
+        counts[key] = counts.get(key, 0) + 1
+        total += 1
+    if total == 0:
+        return {}
+    return {key: round(count / total, 4) for key, count in sorted(counts.items())}

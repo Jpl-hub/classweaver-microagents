@@ -8,6 +8,9 @@ def test_evaluate_review_cases_reports_review_deltas():
                 "final_json": {
                     "evaluation": {
                         "scores": {"overall": 80, "groundedness": 84, "learner_fit": 78},
+                        "issue_tags": ["retrieval_gap", "quiz_gap"],
+                        "primary_issue": "retrieval_gap",
+                        "recommended_strategy": "full_pipeline",
                     },
                     "review_summary": {
                         "executed_rounds": 1,
@@ -33,6 +36,9 @@ def test_evaluate_review_cases_reports_review_deltas():
             "final_json": {
                 "evaluation": {
                     "scores": {"overall": 70, "groundedness": 73, "learner_fit": 72},
+                    "issue_tags": [],
+                    "primary_issue": "none",
+                    "recommended_strategy": "keep",
                 },
                 "review_summary": {},
             }
@@ -53,7 +59,14 @@ def test_evaluate_review_cases_reports_review_deltas():
     assert report["summary"]["avg_groundedness_delta"] == 9.5
     assert report["summary"]["avg_learner_fit_delta"] == 9.0
     assert report["summary"]["review_accept_rate"] == 0.5
+    assert report["summary"]["issue_tag_rates"]["retrieval_gap"] == 0.5
+    assert report["summary"]["issue_tag_rates"]["quiz_gap"] == 0.5
+    assert report["summary"]["primary_issue_rates"]["retrieval_gap"] == 0.5
+    assert report["summary"]["primary_issue_rates"]["none"] == 0.5
+    assert report["summary"]["recommended_strategy_rates"]["full_pipeline"] == 0.5
+    assert report["summary"]["recommended_strategy_rates"]["keep"] == 0.5
     assert report["cases"][0]["strategy"] == "full_pipeline"
     assert report["cases"][0]["pending_multimodal_review"] is True
     assert report["cases"][0]["accepted"] is True
+    assert report["cases"][0]["primary_issue"] == "retrieval_gap"
     assert report["cases"][1]["triggered_review"] is False

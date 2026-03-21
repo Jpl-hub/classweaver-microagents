@@ -95,14 +95,33 @@
             <article class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
               <p class="text-[11px] uppercase tracking-[0.25em] text-slate-400">配置</p>
               <ul class="mt-3 space-y-2 text-sm text-slate-700">
-                <li v-for="[key, value] in configEntries" :key="key">{{ key }}: {{ value }}</li>
+                <li v-for="[key, value] in configEntries" :key="key">{{ key }}: {{ formatValue(value) }}</li>
               </ul>
             </article>
             <article class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
               <p class="text-[11px] uppercase tracking-[0.25em] text-slate-400">摘要指标</p>
               <ul class="mt-3 space-y-2 text-sm text-slate-700">
-                <li v-for="[key, value] in summaryEntries" :key="key">{{ key }}: {{ value }}</li>
+                <li v-for="[key, value] in summaryEntries" :key="key">{{ key }}: {{ formatValue(value) }}</li>
               </ul>
+            </article>
+          </div>
+
+          <div v-if="issueRateGroups.length" class="grid gap-4 lg:grid-cols-3">
+            <article
+              v-for="group in issueRateGroups"
+              :key="group.label"
+              class="rounded-2xl border border-slate-100 bg-slate-50 p-4"
+            >
+              <p class="text-[11px] uppercase tracking-[0.25em] text-slate-400">{{ group.label }}</p>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <span
+                  v-for="item in group.items"
+                  :key="item.key"
+                  class="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-600"
+                >
+                  {{ issueLabel(item.key) }} {{ formatRate(item.value) }}
+                </span>
+              </div>
             </article>
           </div>
         </article>
@@ -164,6 +183,22 @@ const summaryCards = computed(() => {
 
 const configEntries = computed(() => Object.entries((selectedReport.value?.config as Record<string, unknown> | undefined) ?? {}));
 const summaryEntries = computed(() => Object.entries((selectedReport.value?.summary as Record<string, unknown> | undefined) ?? {}));
+const issueRateGroups = computed(() => {
+  const summary = (selectedReport.value?.summary as Record<string, unknown> | undefined) ?? {};
+  const groups = [
+    { label: "问题标签分布", value: summary.issue_tag_rates },
+    { label: "主问题分布", value: summary.primary_issue_rates },
+    { label: "建议策略分布", value: summary.recommended_strategy_rates },
+  ];
+  return groups
+    .map((group) => ({
+      label: group.label,
+      items: Object.entries((group.value as Record<string, unknown> | undefined) ?? {})
+        .filter(([, value]) => typeof value === "number")
+        .map(([key, value]) => ({ key, value: Number(value) })),
+    }))
+    .filter((group) => group.items.length);
+});
 const compareMetrics = computed(() =>
   Object.entries(compareResult.value?.diff?.metrics ?? {}).map(([name, metric]) => ({
     name,
@@ -255,6 +290,33 @@ function formatNumber(value: unknown) {
 function signedNumber(value: unknown) {
   if (typeof value === "number") return `${value > 0 ? "+" : ""}${value.toFixed(Number.isInteger(value) ? 0 : 4)}`;
   return String(value ?? "-");
+}
+
+function formatValue(value: unknown) {
+  if (typeof value === "number") return formatNumber(value);
+  if (value && typeof value === "object") return JSON.stringify(value);
+  return String(value ?? "-");
+}
+
+function formatRate(value: number) {
+  return `${(value * 100).toFixed(0)}%`;
+}
+
+function issueLabel(value: string) {
+  const labels: Record<string, string> = {
+    retrieval_gap: "检索不足",
+    evidence_gap: "证据不足",
+    tutoring_gap: "练习承接不足",
+    quiz_gap: "测验不足",
+    learner_fit_gap: "体验不足",
+    multimodal_gap: "多模态复核",
+    full_pipeline: "全链路复核",
+    tutor_only: "定向补练习",
+    multimodal_review: "多模态复核",
+    keep: "保持版本",
+    none: "无明显短板",
+  };
+  return labels[value] ?? value;
 }
 
 onMounted(loadReports);
