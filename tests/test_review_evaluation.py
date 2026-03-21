@@ -21,7 +21,9 @@ def test_evaluate_review_cases_reports_review_deltas():
                             {
                                 "strategy": "full_pipeline",
                                 "initial_evaluation": {
-                                    "scores": {"overall": 62, "groundedness": 65, "learner_fit": 60}
+                                    "scores": {"overall": 62, "groundedness": 65, "learner_fit": 60},
+                                    "issue_tags": ["retrieval_gap", "quiz_gap", "multimodal_gap"],
+                                    "primary_issue": "retrieval_gap",
                                 },
                                 "evaluation": {
                                     "scores": {"overall": 80, "groundedness": 84, "learner_fit": 78}
@@ -65,8 +67,12 @@ def test_evaluate_review_cases_reports_review_deltas():
     assert report["summary"]["primary_issue_rates"]["none"] == 0.5
     assert report["summary"]["recommended_strategy_rates"]["full_pipeline"] == 0.5
     assert report["summary"]["recommended_strategy_rates"]["keep"] == 0.5
+    assert report["summary"]["resolved_issue_tag_rates"]["multimodal_gap"] == 1.0
+    assert report["summary"]["primary_issue_shift_rate"] == 0.0
     assert report["cases"][0]["strategy"] == "full_pipeline"
     assert report["cases"][0]["pending_multimodal_review"] is True
     assert report["cases"][0]["accepted"] is True
+    assert report["cases"][0]["resolved_issue_tags"] == ["multimodal_gap"]
+    assert report["cases"][0]["introduced_issue_tags"] == []
     assert report["cases"][0]["primary_issue"] == "retrieval_gap"
     assert report["cases"][1]["triggered_review"] is False

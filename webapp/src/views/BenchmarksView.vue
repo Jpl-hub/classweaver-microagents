@@ -189,6 +189,8 @@ const issueRateGroups = computed(() => {
     { label: "问题标签分布", value: summary.issue_tag_rates },
     { label: "主问题分布", value: summary.primary_issue_rates },
     { label: "建议策略分布", value: summary.recommended_strategy_rates },
+    { label: "已解决问题", value: summary.resolved_issue_tag_rates },
+    { label: "新引入问题", value: summary.introduced_issue_tag_rates },
   ];
   return groups
     .map((group) => ({
@@ -221,6 +223,7 @@ const compareInsights = computed(() => {
   const scoreDelta = Number(metrics.avg_score_delta?.candidate ?? 0);
   const acceptRate = Number(metrics.review_accept_rate?.candidate ?? 0);
   const triggerRate = Number(metrics.review_trigger_rate?.candidate ?? 0);
+  const shiftRate = Number(metrics.primary_issue_shift_rate?.candidate ?? 0);
 
   if (triggerRate > 0) {
     insights.push(`review 已经真正参与执行，触发率 ${triggerRate.toFixed(2)}。`);
@@ -234,6 +237,9 @@ const compareInsights = computed(() => {
   }
   if (acceptRate > 0) {
     insights.push(`当前有 ${(acceptRate * 100).toFixed(0)}% 的 review 候选被采纳，说明采纳策略已经开始过滤负增益结果。`);
+  }
+  if (shiftRate > 0) {
+    insights.push(`有 ${(shiftRate * 100).toFixed(0)}% 的样本在 review 后主问题发生了变化，说明系统不只是重写答案，而是真的在推动问题类型迁移。`);
   }
   return insights;
 });
