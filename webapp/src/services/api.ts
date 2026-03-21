@@ -1,5 +1,6 @@
 import type {
   KnowledgeDocumentListResponse,
+  KnowledgeQaResponse,
   KnowledgeSearchResponse,
   KnowledgeBase,
   BenchmarkReportCompareResponse,
@@ -148,7 +149,7 @@ export function searchKnowledge(payload: RagSearchRequest): Promise<KnowledgeSea
   });
 }
 
-export function knowledgeQa(question: string, baseId?: string | number, top_k = 4) {
+export function knowledgeQa(question: string, baseId?: string | number, top_k = 4): Promise<KnowledgeQaResponse> {
   return request("/api/kb/qa/", {
     method: "POST",
     body: JSON.stringify({

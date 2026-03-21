@@ -234,6 +234,16 @@ export interface KnowledgeQaResponse {
   contexts: KnowledgeSearchResult[];
   citations?: CitationItem[];
   retrieval_diagnostics?: RetrievalDiagnostics;
+  followup?: {
+    confidence?: {
+      score?: number;
+      label?: string;
+      rationale?: string;
+    };
+    evidence_summary?: string;
+    next_steps?: string[];
+    suggested_questions?: string[];
+  };
 }
 
 export interface KnowledgeBase {

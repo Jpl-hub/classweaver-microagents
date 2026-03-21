@@ -118,8 +118,65 @@
                       ? 'message-bubble--system'
                       : 'message-bubble--assistant'
                 "
-                v-html="formatMessageText(message.text)"
-              />
+              >
+                <template v-if="message.role === 'system' && message.kind === 'knowledge' && message.qa">
+                  <div class="space-y-3">
+                    <div class="space-y-1">
+                      <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">回答</p>
+                      <div v-html="formatMessageText(message.text)" />
+                    </div>
+                    <div
+                      v-if="message.qa.followup?.confidence?.label || message.qa.followup?.evidence_summary"
+                      class="rounded-2xl border border-slate-200/80 bg-white/80 p-3 text-xs text-slate-600"
+                    >
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span class="font-semibold text-slate-800">依据与把握度</span>
+                        <span
+                          v-if="message.qa.followup?.confidence?.label"
+                          class="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-500"
+                        >
+                          {{ message.qa.followup?.confidence?.label }}
+                        </span>
+                      </div>
+                      <p v-if="message.qa.followup?.confidence?.rationale" class="mt-1">
+                        {{ message.qa.followup?.confidence?.rationale }}
+                      </p>
+                      <p v-if="message.qa.followup?.evidence_summary" class="mt-1">
+                        {{ message.qa.followup?.evidence_summary }}
+                      </p>
+                    </div>
+                    <div v-if="message.qa.followup?.next_steps?.length" class="space-y-2">
+                      <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">建议下一步</p>
+                      <ul class="space-y-1 text-xs text-slate-600">
+                        <li
+                          v-for="step in message.qa.followup?.next_steps"
+                          :key="step"
+                          class="rounded-2xl border border-slate-200/70 bg-white/70 px-3 py-2"
+                        >
+                          {{ step }}
+                        </li>
+                      </ul>
+                    </div>
+                    <div v-if="message.qa.followup?.suggested_questions?.length" class="space-y-2">
+                      <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">你可以继续问</p>
+                      <div class="flex flex-wrap gap-2">
+                        <button
+                          v-for="prompt in message.qa.followup?.suggested_questions"
+                          :key="prompt"
+                          type="button"
+                          class="rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-xs text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+                          @click="reuseSuggestedQuestion(prompt)"
+                        >
+                          {{ prompt }}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+                <template v-else>
+                  <div v-html="formatMessageText(message.text)" />
+                </template>
+              </div>
             </div>
           </div>
         </div>
@@ -529,7 +586,14 @@ import {
   startQuiz,
   triggerRecommendations,
 } from "../services/api";
-import type { LessonEventEntry, PrestudyJobTicket, PrestudyResponse, RecommendationSuggestion, QuizQuestion } from "../types";
+import type {
+  KnowledgeQaResponse,
+  LessonEventEntry,
+  PrestudyJobTicket,
+  PrestudyResponse,
+  RecommendationSuggestion,
+  QuizQuestion,
+} from "../types";
 import {
   DEFAULT_KNOWLEDGE_BASE,
   KNOWLEDGE_BASE_SELECTION_KEY,
@@ -558,6 +622,7 @@ interface ChatMessage {
   role: "user" | "system";
   text: string;
   kind?: "status" | "job" | "knowledge";
+  qa?: KnowledgeQaResponse;
   created_at: number;
 }
 
@@ -982,8 +1047,7 @@ async function handleKnowledgeQuery(query: string) {
       appendMessage("system", "知识库中没有找到相关内容。", "knowledge");
       return;
     }
-    const rendered = `${resp.answer}`;
-    appendMessage("system", rendered, "knowledge");
+    appendMessage("system", resp.answer, "knowledge", resp);
   } catch (error) {
     chatError.value = (error as Error).message;
   }
@@ -1049,7 +1113,7 @@ async function handleGenerateFromPpt(file: File) {
   }
 }
 
-function appendMessage(role: ChatMessage["role"], text: string, kind?: ChatMessage["kind"]) {
+function appendMessage(role: ChatMessage["role"], text: string, kind?: ChatMessage["kind"], qa?: KnowledgeQaResponse) {
   conversation.value = [
     ...conversation.value,
     {
@@ -1057,10 +1121,16 @@ function appendMessage(role: ChatMessage["role"], text: string, kind?: ChatMessa
       role,
       text,
       kind,
+      qa,
       created_at: Date.now(),
     },
   ].slice(-MAX_CONVERSATION_LENGTH);
   persistConversation();
+}
+
+function reuseSuggestedQuestion(prompt: string) {
+  chatMode.value = "knowledge";
+  chatInput.value = prompt;
 }
 
 function persistConversation() {
