@@ -145,6 +145,22 @@
                         {{ message.qa.followup?.evidence_summary }}
                       </p>
                     </div>
+                    <div v-if="message.qa.citations?.length" class="space-y-2">
+                      <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">本次参考来源</p>
+                      <ul class="space-y-2 text-xs text-slate-600">
+                        <li
+                          v-for="citation in message.qa.citations"
+                          :key="`${citation.doc_id}-${citation.chunk_id}`"
+                          class="rounded-2xl border border-slate-200/70 bg-white/70 px-3 py-2"
+                        >
+                          <div class="flex flex-wrap items-center gap-2">
+                            <span class="font-semibold text-slate-800">{{ citation.label || "来源" }}</span>
+                            <span class="text-slate-500">{{ citation.title || citation.doc_id }}</span>
+                          </div>
+                          <p v-if="citation.text" class="mt-1 text-slate-500">{{ citation.text }}</p>
+                        </li>
+                      </ul>
+                    </div>
                     <div v-if="message.qa.followup?.next_steps?.length" class="space-y-2">
                       <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">建议下一步</p>
                       <ul class="space-y-1 text-xs text-slate-600">
