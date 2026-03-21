@@ -151,6 +151,27 @@
               <li v-for="item in compareInsights" :key="item">{{ item }}</li>
             </ul>
           </div>
+          <div v-if="compareIssueDeltaGroups.length" class="grid gap-4 lg:grid-cols-3">
+            <article
+              v-for="group in compareIssueDeltaGroups"
+              :key="group.label"
+              class="rounded-2xl border border-slate-100 bg-slate-50 p-4"
+            >
+              <p class="text-[11px] uppercase tracking-[0.25em] text-slate-400">{{ group.label }}</p>
+              <div class="mt-3 space-y-2 text-sm text-slate-700">
+                <div
+                  v-for="item in group.items"
+                  :key="item.key"
+                  class="flex items-center justify-between rounded-2xl border border-white/80 bg-white/80 px-3 py-2"
+                >
+                  <span>{{ issueLabel(item.key) }}</span>
+                  <span :class="item.delta < 0 ? 'text-emerald-700' : item.delta > 0 ? 'text-rose-700' : 'text-slate-500'">
+                    {{ signedPercent(item.delta) }}
+                  </span>
+                </div>
+              </div>
+            </article>
+          </div>
         </article>
       </div>
     </section>
@@ -216,6 +237,8 @@ const suggestedPair = computed(() => {
   if (!baseline || !candidate) return null;
   return { baseline, candidate };
 });
+const baselineReport = computed(() => reports.value.find((report) => report.name === compareResult.value?.baseline) ?? null);
+const candidateReport = computed(() => reports.value.find((report) => report.name === compareResult.value?.candidate) ?? null);
 const compareInsights = computed(() => {
   const metrics = compareResult.value?.diff?.metrics ?? {};
   const insights: string[] = [];
@@ -224,6 +247,14 @@ const compareInsights = computed(() => {
   const acceptRate = Number(metrics.review_accept_rate?.candidate ?? 0);
   const triggerRate = Number(metrics.review_trigger_rate?.candidate ?? 0);
   const shiftRate = Number(metrics.primary_issue_shift_rate?.candidate ?? 0);
+  const resolvedChanges = diffRateMap(
+    (baselineReport.value?.summary?.resolved_issue_tag_rates as Record<string, unknown> | undefined) ?? {},
+    (candidateReport.value?.summary?.resolved_issue_tag_rates as Record<string, unknown> | undefined) ?? {},
+  );
+  const introducedChanges = diffRateMap(
+    (baselineReport.value?.summary?.introduced_issue_tag_rates as Record<string, unknown> | undefined) ?? {},
+    (candidateReport.value?.summary?.introduced_issue_tag_rates as Record<string, unknown> | undefined) ?? {},
+  );
 
   if (triggerRate > 0) {
     insights.push(`review 已经真正参与执行，触发率 ${triggerRate.toFixed(2)}。`);
@@ -241,7 +272,53 @@ const compareInsights = computed(() => {
   if (shiftRate > 0) {
     insights.push(`有 ${(shiftRate * 100).toFixed(0)}% 的样本在 review 后主问题发生了变化，说明系统不只是重写答案，而是真的在推动问题类型迁移。`);
   }
+  const strongestResolved = resolvedChanges
+    .filter((item) => item.delta > 0)
+    .sort((left, right) => right.delta - left.delta)[0];
+  if (strongestResolved) {
+    insights.push(`相比 baseline，review 更常消掉“${issueLabel(strongestResolved.key)}”，提升 ${signedPercent(strongestResolved.delta)}。`);
+  }
+  const strongestIntroduced = introducedChanges
+    .filter((item) => item.delta > 0)
+    .sort((left, right) => right.delta - left.delta)[0];
+  if (strongestIntroduced) {
+    insights.push(`当前也更容易新引入“${issueLabel(strongestIntroduced.key)}”，增加 ${signedPercent(strongestIntroduced.delta)}，这部分还要继续压。`);
+  }
   return insights;
+});
+const compareIssueDeltaGroups = computed(() => {
+  const groups = [
+    {
+      label: "已解决问题变化",
+      items: diffRateMap(
+        (baselineReport.value?.summary?.resolved_issue_tag_rates as Record<string, unknown> | undefined) ?? {},
+        (candidateReport.value?.summary?.resolved_issue_tag_rates as Record<string, unknown> | undefined) ?? {},
+      ),
+    },
+    {
+      label: "新引入问题变化",
+      items: diffRateMap(
+        (baselineReport.value?.summary?.introduced_issue_tag_rates as Record<string, unknown> | undefined) ?? {},
+        (candidateReport.value?.summary?.introduced_issue_tag_rates as Record<string, unknown> | undefined) ?? {},
+      ),
+    },
+    {
+      label: "主问题变化",
+      items: diffRateMap(
+        (baselineReport.value?.summary?.primary_issue_rates as Record<string, unknown> | undefined) ?? {},
+        (candidateReport.value?.summary?.primary_issue_rates as Record<string, unknown> | undefined) ?? {},
+      ),
+    },
+  ];
+  return groups
+    .map((group) => ({
+      label: group.label,
+      items: group.items
+        .filter((item) => item.delta !== 0)
+        .sort((left, right) => Math.abs(right.delta) - Math.abs(left.delta))
+        .slice(0, 4),
+    }))
+    .filter((group) => group.items.length);
 });
 
 async function loadReports() {
@@ -323,6 +400,20 @@ function issueLabel(value: string) {
     none: "无明显短板",
   };
   return labels[value] ?? value;
+}
+
+function diffRateMap(baseline: Record<string, unknown>, candidate: Record<string, unknown>) {
+  const keys = new Set([...Object.keys(baseline), ...Object.keys(candidate)]);
+  return [...keys].map((key) => ({
+    key,
+    baseline: Number(baseline[key] ?? 0),
+    candidate: Number(candidate[key] ?? 0),
+    delta: Number((Number(candidate[key] ?? 0) - Number(baseline[key] ?? 0)).toFixed(4)),
+  }));
+}
+
+function signedPercent(value: number) {
+  return `${value > 0 ? "+" : ""}${(value * 100).toFixed(0)}%`;
 }
 
 onMounted(loadReports);
