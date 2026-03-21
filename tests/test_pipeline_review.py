@@ -130,6 +130,7 @@ def test_run_pipeline_uses_tutor_only_review_for_practice_gap(monkeypatch):
                 "evaluation": {
                     "scores": {"overall": 63},
                     "verdict": "review",
+                    "recommended_strategy": "tutor_only",
                     "rule_metrics": {
                         "gates": {
                             "needs_more_practice": True,
@@ -180,6 +181,85 @@ def test_run_pipeline_uses_tutor_only_review_for_practice_gap(monkeypatch):
     assert review_summary["executed_rounds"] == 1
     assert review_summary["cycles"][0]["strategy"] == "tutor_only"
     assert review_summary["cycles"][0]["accepted"] is True
+    assert tutor_only_calls == ["review_1_tutor"]
+
+
+@pytest.mark.django_db
+def test_run_pipeline_prefers_recommended_strategy_from_evaluation(monkeypatch):
+    user = User.objects.create_user(username="strategy-reviewer", password="secret123")
+    base = KnowledgeBase.objects.create(user=user, name="Physics 4")
+    job = PrestudyJob.objects.create(user=user, knowledge_base=base, source_type="text", source_excerpt="", status="queued")
+
+    monkeypatch.setattr(pipeline, "build_client", lambda settings_map: object())
+    monkeypatch.setattr(
+        pipeline,
+        "_collect_rag_context",
+        lambda **kwargs: {
+            "results": [{"text": "chunk", "refs": [{"doc_id": "doc-1", "chunk_id": "c1"}], "title": "sample"}],
+            "diagnostics": {"enabled": True, "backend": "pgvector", "search_k": 5, "final_hits": 2},
+        },
+    )
+
+    monkeypatch.setattr(
+        pipeline.runtime,
+        "orchestrate_pipeline",
+        lambda **kwargs: {
+            "planner_json": {"title": "牛顿第一定律"},
+            "final_json": {
+                "title": "牛顿第一定律",
+                "knowledge_points": [],
+                "quiz": {"items": []},
+                "evaluation": {
+                    "scores": {"overall": 62},
+                    "verdict": "review",
+                    "recommended_strategy": "tutor_only",
+                    "rule_metrics": {
+                        "gates": {
+                            "needs_more_practice": False,
+                            "needs_more_references": True,
+                        }
+                    },
+                },
+                "reflection": {
+                    "diagnosis": ["学习承接不足"],
+                    "next_actions": ["只补练习，不重跑全链路"],
+                    "should_regenerate": True,
+                    "should_expand_retrieval": False,
+                    "should_add_multimodal_review": False,
+                },
+            },
+            "model_trace": [{"step": "evaluator", "cycle": "initial"}],
+            "status": "completed",
+        },
+    )
+
+    tutor_only_calls = []
+
+    monkeypatch.setattr(
+        pipeline.runtime,
+        "run_tutor_evaluation_cycle",
+        lambda **kwargs: tutor_only_calls.append(kwargs["cycle_label"]) or {
+            "planner_json": {"title": "牛顿第一定律"},
+            "final_json": {
+                "title": "牛顿第一定律",
+                "knowledge_points": [],
+                "quiz": {"items": []},
+                "evaluation": {"scores": {"overall": 72}, "verdict": "pass"},
+                "reflection": {
+                    "diagnosis": ["练习已补齐"],
+                    "next_actions": ["继续观察"],
+                    "should_regenerate": False,
+                    "should_expand_retrieval": False,
+                    "should_add_multimodal_review": False,
+                },
+            },
+            "model_trace": [{"step": "evaluator", "cycle": "review_1_tutor"}],
+            "status": "completed",
+        },
+    )
+
+    response = pipeline.run_pipeline(job=job, text="请生成一节牛顿第一定律预习课")
+    assert response["final_json"]["review_summary"]["cycles"][0]["strategy"] == "tutor_only"
     assert tutor_only_calls == ["review_1_tutor"]
 
 

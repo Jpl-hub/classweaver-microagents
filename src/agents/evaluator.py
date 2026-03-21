@@ -87,11 +87,19 @@ def build_quality_report(
         raise ValueError(f"Evaluator response validation failed: {exc}") from exc
 
     llm_payload = validated.model_dump()
+    issue_map = _derive_issue_map(
+        rule_metrics=rule_metrics,
+        scores=llm_payload["scores"],
+        reflection=llm_payload["reflection"],
+    )
     return {
         "evaluation": {
             "verdict": llm_payload["verdict"],
             "scores": llm_payload["scores"],
             "rule_metrics": rule_metrics,
+            "issue_tags": issue_map["issue_tags"],
+            "primary_issue": issue_map["primary_issue"],
+            "recommended_strategy": issue_map["recommended_strategy"],
             "strengths": llm_payload["strengths"],
             "risks": llm_payload["risks"],
             "missing_evidence": llm_payload["missing_evidence"],
@@ -267,3 +275,57 @@ def _ratio(numerator: int, denominator: int) -> int:
     if denominator <= 0:
         return 0
     return max(0, min(100, round((numerator / denominator) * 100)))
+
+
+def _derive_issue_map(
+    *,
+    rule_metrics: Dict[str, Any],
+    scores: Dict[str, Any],
+    reflection: Dict[str, Any],
+) -> Dict[str, Any]:
+    gates = rule_metrics.get("gates") or {}
+    counts = rule_metrics.get("counts") or {}
+    issue_tags: List[str] = []
+
+    if gates.get("needs_more_references"):
+        issue_tags.append("evidence_gap")
+    if gates.get("needs_more_retrieval") or reflection.get("should_expand_retrieval"):
+        issue_tags.append("retrieval_gap")
+    if gates.get("needs_more_practice"):
+        issue_tags.append("tutoring_gap")
+    if int(counts.get("quiz_items", 0) or 0) < 4 or int(scores.get("quiz_quality", 0) or 0) < 70:
+        issue_tags.append("quiz_gap")
+    if int(scores.get("learner_fit", 0) or 0) < 70:
+        issue_tags.append("learner_fit_gap")
+    if reflection.get("should_add_multimodal_review"):
+        issue_tags.append("multimodal_gap")
+
+    ordered_tags = list(dict.fromkeys(issue_tags))
+
+    if "retrieval_gap" in ordered_tags:
+        primary_issue = "retrieval_gap"
+        recommended_strategy = "full_pipeline"
+    elif "evidence_gap" in ordered_tags:
+        primary_issue = "evidence_gap"
+        recommended_strategy = "full_pipeline"
+    elif "tutoring_gap" in ordered_tags:
+        primary_issue = "tutoring_gap"
+        recommended_strategy = "tutor_only"
+    elif "quiz_gap" in ordered_tags:
+        primary_issue = "quiz_gap"
+        recommended_strategy = "full_pipeline"
+    elif "learner_fit_gap" in ordered_tags:
+        primary_issue = "learner_fit_gap"
+        recommended_strategy = "tutor_only"
+    elif "multimodal_gap" in ordered_tags:
+        primary_issue = "multimodal_gap"
+        recommended_strategy = "multimodal_review"
+    else:
+        primary_issue = "none"
+        recommended_strategy = "keep"
+
+    return {
+        "issue_tags": ordered_tags,
+        "primary_issue": primary_issue,
+        "recommended_strategy": recommended_strategy,
+    }

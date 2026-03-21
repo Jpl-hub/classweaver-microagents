@@ -73,6 +73,32 @@
 
       <div class="grid gap-4 lg:grid-cols-2">
         <article class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+          <p class="text-[11px] uppercase tracking-[0.25em] text-slate-400">主问题定位</p>
+          <p class="mt-2 text-lg font-semibold text-slate-900">{{ issueLabel(primaryIssue) }}</p>
+          <p class="mt-1 text-sm text-slate-500">系统当前优先修正的短板，不再只看统一 verdict。</p>
+        </article>
+        <article class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+          <p class="text-[11px] uppercase tracking-[0.25em] text-slate-400">建议修正路径</p>
+          <p class="mt-2 text-lg font-semibold text-slate-900">{{ strategyLabel(props.evaluation?.recommended_strategy) }}</p>
+          <p class="mt-1 text-sm text-slate-500">供 review cycle 选择 corrective policy。</p>
+        </article>
+      </div>
+
+      <article v-if="issueTags.length" class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+        <p class="text-[11px] uppercase tracking-[0.25em] text-slate-400">问题标签</p>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <span
+            v-for="tag in issueTags"
+            :key="tag"
+            class="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-600"
+          >
+            {{ issueLabel(tag) }}
+          </span>
+        </div>
+      </article>
+
+      <div class="grid gap-4 lg:grid-cols-2">
+        <article class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
           <p class="text-[11px] uppercase tracking-[0.25em] text-slate-400">学习体验</p>
           <div class="mt-3 space-y-3 text-sm text-slate-700">
             <p><span class="font-semibold text-slate-900">丝滑度：</span>{{ learnerExperience.smoothness || "暂无" }}</p>
@@ -270,6 +296,8 @@ const reflectionList = computed(() => {
 const reviewSummary = computed(() => props.reviewSummary ?? null);
 const acceptedReviewCount = computed(() => (reviewSummary.value?.cycles ?? []).filter((cycle) => cycle.accepted).length);
 const rejectedReviewCount = computed(() => (reviewSummary.value?.cycles ?? []).filter((cycle) => cycle.accepted === false).length);
+const issueTags = computed(() => props.evaluation?.issue_tags ?? []);
+const primaryIssue = computed(() => props.evaluation?.primary_issue ?? "none");
 
 const evidenceCoverage = computed(() => {
   const counts = props.evaluation?.rule_metrics?.counts ?? {};
@@ -312,6 +340,21 @@ const trustNarrative = computed(() => {
 function strategyLabel(value?: string) {
   if (value === "tutor_only") return "定向补练习";
   if (value === "full_pipeline") return "全链路复核";
+  if (value === "multimodal_review") return "多模态复核";
+  if (value === "keep") return "保持当前版本";
   return value || "复核";
+}
+
+function issueLabel(value?: string) {
+  const labels: Record<string, string> = {
+    retrieval_gap: "检索不足",
+    evidence_gap: "证据不足",
+    tutoring_gap: "练习承接不足",
+    quiz_gap: "测验质量不足",
+    learner_fit_gap: "学习体验不足",
+    multimodal_gap: "需要多模态复核",
+    none: "暂无明显短板",
+  };
+  return labels[value || ""] ?? (value || "未标注");
 }
 </script>

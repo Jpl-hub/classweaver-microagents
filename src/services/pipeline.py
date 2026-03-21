@@ -121,9 +121,13 @@ def _choose_review_outcome(
 
 
 def _select_review_strategy(final_payload: Dict[str, Any], reflection: Dict[str, Any]) -> str:
+    evaluation = final_payload.get("evaluation") or {}
+    recommended_strategy = str(evaluation.get("recommended_strategy", "")).strip()
+    if recommended_strategy in {"tutor_only", "full_pipeline"}:
+        return recommended_strategy
     if reflection.get("should_expand_retrieval"):
         return "full_pipeline"
-    rule_metrics = (final_payload.get("evaluation") or {}).get("rule_metrics") or {}
+    rule_metrics = evaluation.get("rule_metrics") or {}
     gates = rule_metrics.get("gates") or {}
     if gates.get("needs_more_practice") and not gates.get("needs_more_references"):
         return "tutor_only"

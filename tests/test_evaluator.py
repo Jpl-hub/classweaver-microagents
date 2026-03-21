@@ -73,4 +73,7 @@ def test_build_quality_report_combines_rule_metrics_and_llm_judgement():
     assert payload["evaluation"]["scores"]["overall"] == 80
     assert payload["evaluation"]["rule_metrics"]["counts"]["quiz_items"] == 1
     assert payload["evaluation"]["rule_metrics"]["gates"]["needs_more_practice"] is False
+    assert payload["evaluation"]["issue_tags"] == ["retrieval_gap", "quiz_gap", "multimodal_gap"]
+    assert payload["evaluation"]["primary_issue"] == "retrieval_gap"
+    assert payload["evaluation"]["recommended_strategy"] == "full_pipeline"
     assert payload["reflection"]["should_add_multimodal_review"] is True

@@ -98,6 +98,9 @@ export interface QualityEvaluation {
   verdict?: "pass" | "review" | "block" | string;
   scores?: Partial<EvaluationScores>;
   rule_metrics?: EvaluationRuleMetrics;
+  issue_tags?: string[];
+  primary_issue?: string;
+  recommended_strategy?: string;
   strengths?: string[];
   risks?: string[];
   missing_evidence?: string[];
