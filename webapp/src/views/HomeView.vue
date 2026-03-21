@@ -278,6 +278,53 @@
           </div>
           <p v-if="chatError" class="text-sm text-rose-600">{{ chatError }}</p>
         </form>
+        <article
+          v-if="latestKnowledgeMessage?.qa"
+          class="rounded-3xl border border-slate-200/80 bg-slate-50/90 p-4 shadow-sm space-y-3"
+        >
+          <header class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p class="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">问答接力</p>
+              <h3 class="text-base font-semibold text-slate-900">把刚刚这次提问继续接到主线学习里</h3>
+            </div>
+            <span
+              v-if="latestKnowledgeMessage.qa.followup?.confidence?.label"
+              class="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-500"
+            >
+              {{ latestKnowledgeMessage.qa.followup?.confidence?.label }}
+            </span>
+          </header>
+          <p v-if="latestKnowledgeMessage.qa.followup?.evidence_summary" class="text-sm text-slate-600">
+            {{ latestKnowledgeMessage.qa.followup?.evidence_summary }}
+          </p>
+          <div v-if="latestKnowledgeMessage.taskHint" class="rounded-2xl border border-slate-200/70 bg-white/80 p-3 text-sm text-slate-600">
+            <p class="font-semibold text-slate-900">{{ latestKnowledgeMessage.taskHint.title }}</p>
+            <p class="mt-1">{{ latestKnowledgeMessage.taskHint.summary }}</p>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                class="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white transition hover:bg-slate-700"
+                @click="runKnowledgeTaskHint(latestKnowledgeMessage.taskHint.action)"
+              >
+                {{ latestKnowledgeMessage.taskHint.actionLabel }}
+              </button>
+            </div>
+          </div>
+          <div v-if="latestKnowledgeMessage.qa.followup?.suggested_questions?.length" class="space-y-2">
+            <p class="text-xs font-semibold text-slate-500">继续追问</p>
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="prompt in latestKnowledgeMessage.qa.followup?.suggested_questions"
+                :key="prompt"
+                type="button"
+                class="rounded-full border border-slate-200 bg-white/90 px-3 py-1 text-xs text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+                @click="reuseSuggestedQuestion(prompt)"
+              >
+                {{ prompt }}
+              </button>
+            </div>
+          </div>
+        </article>
 
       </article>
 
@@ -755,6 +802,10 @@ const conversation = ref<ChatMessage[]>([
     created_at: Date.now(),
   },
 ]);
+const latestKnowledgeMessage = computed(() => {
+  const items = [...conversation.value].reverse();
+  return items.find((message) => message.role === "system" && message.kind === "knowledge" && message.qa) ?? null;
+});
 const sendingMessage = ref(false);
 const chatError = ref("");
 const jobReady = computed(() => Boolean(job.value && job.value.status !== "failed"));
