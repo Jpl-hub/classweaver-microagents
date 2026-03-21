@@ -383,6 +383,8 @@
           v-if="job"
           :current-overall="evaluationOverallScore"
           :current-verdict="evaluationInsights?.verdict ?? null"
+          :current-primary-issue="evaluationInsights?.primary_issue ?? null"
+          :current-recommended-strategy="evaluationInsights?.recommended_strategy ?? null"
         />
         <RetrievalDiagnosticsCard v-if="job" :diagnostics="retrievalDiagnostics" />
         <EvaluationInsightsCard

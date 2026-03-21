@@ -44,11 +44,14 @@ import type { BenchmarkReportCompareResponse, BenchmarkReportSummary } from "../
 const props = defineProps<{
   currentOverall?: number | null;
   currentVerdict?: string | null;
+  currentPrimaryIssue?: string | null;
+  currentRecommendedStrategy?: string | null;
 }>();
 
 const loading = ref(false);
 const error = ref("");
 const snapshot = ref<BenchmarkReportCompareResponse | null>(null);
+const candidateSummary = ref<Record<string, unknown> | null>(null);
 
 const cards = computed(() => {
   const metrics = snapshot.value?.diff?.metrics ?? {};
@@ -103,6 +106,24 @@ const insights = computed(() => {
       result.push(`这次任务的总分比最近 review 实验均值低 ${Math.abs(delta).toFixed(2)}，适合回看 trace 和证据覆盖。`);
     }
   }
+  const primaryIssue = String(props.currentPrimaryIssue || "").trim();
+  const issueRates = (candidateSummary.value?.primary_issue_rates as Record<string, unknown> | undefined) ?? {};
+  const strategyRates = (candidateSummary.value?.recommended_strategy_rates as Record<string, unknown> | undefined) ?? {};
+  if (primaryIssue) {
+    const rate = typeof issueRates[primaryIssue] === "number" ? Number(issueRates[primaryIssue]) : null;
+    if (rate !== null) {
+      result.push(`当前主问题是“${issueLabel(primaryIssue)}”，在最近 review 实验里占比 ${percent(rate)}。`);
+    } else {
+      result.push(`当前主问题是“${issueLabel(primaryIssue)}”，但最近 benchmark 里还没有足够样本。`);
+    }
+  }
+  const recommendedStrategy = String(props.currentRecommendedStrategy || "").trim();
+  if (recommendedStrategy) {
+    const rate = typeof strategyRates[recommendedStrategy] === "number" ? Number(strategyRates[recommendedStrategy]) : null;
+    if (rate !== null) {
+      result.push(`系统建议走“${strategyLabel(recommendedStrategy)}”，这条路径在最近 review 实验里占比 ${percent(rate)}。`);
+    }
+  }
   return result;
 });
 
@@ -116,8 +137,10 @@ async function loadSnapshot() {
     const pair = pickSuggestedReviewPair(reportList.reports ?? []);
     if (!pair) {
       snapshot.value = null;
+      candidateSummary.value = null;
       return;
     }
+    candidateSummary.value = (pair.candidate.summary as Record<string, unknown> | undefined) ?? null;
     snapshot.value = await compareBenchmarkReports(pair.baseline.name, pair.candidate.name);
   } catch (err) {
     error.value = (err as Error).message;
@@ -154,5 +177,28 @@ function numericDelta(value: unknown) {
 
 function percent(value: number) {
   return `${(value * 100).toFixed(0)}%`;
+}
+
+function issueLabel(value: string) {
+  const labels: Record<string, string> = {
+    retrieval_gap: "检索不足",
+    evidence_gap: "证据不足",
+    tutoring_gap: "练习承接不足",
+    quiz_gap: "测验不足",
+    learner_fit_gap: "体验不足",
+    multimodal_gap: "多模态复核",
+    none: "无明显短板",
+  };
+  return labels[value] ?? value;
+}
+
+function strategyLabel(value: string) {
+  const labels: Record<string, string> = {
+    full_pipeline: "全链路复核",
+    tutor_only: "定向补练习",
+    multimodal_review: "多模态复核",
+    keep: "保持当前版本",
+  };
+  return labels[value] ?? value;
 }
 </script>

@@ -58,6 +58,8 @@
       v-if="jobDetail"
       :current-overall="jobOverallScore"
       :current-verdict="jobEvaluation?.verdict ?? null"
+      :current-primary-issue="jobEvaluation?.primary_issue ?? null"
+      :current-recommended-strategy="jobEvaluation?.recommended_strategy ?? null"
     />
     <RetrievalDiagnosticsCard v-if="jobDetail" :diagnostics="jobDiagnostics" />
     <EvaluationInsightsCard
