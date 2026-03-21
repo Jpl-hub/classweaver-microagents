@@ -313,8 +313,17 @@
               :key="action.id || action.title"
               class="rounded-2xl border border-white/70 bg-white/90 p-3"
             >
-              <p class="font-semibold text-slate-900">{{ action.title }}</p>
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <p class="font-semibold text-slate-900">{{ action.title }}</p>
+                <span
+                  v-if="typeof action.confidence === 'number'"
+                  class="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500"
+                >
+                  {{ formatConfidence(action.confidence) }}
+                </span>
+              </div>
               <p>{{ action.summary }}</p>
+              <p v-if="action.reason" class="mt-1 text-[11px] text-slate-500">原因：{{ action.reason }}</p>
             </article>
           </div>
           <p v-else class="text-xs text-slate-400">暂无建议，点击上方“刷新推荐”获取新的学习步骤。</p>
@@ -1443,6 +1452,11 @@ function difficultyLabel(level?: string) {
     hard: "困难",
   };
   return level ? labels[level] ?? level : "未知";
+}
+
+function formatConfidence(value?: number) {
+  if (typeof value !== "number") return "";
+  return `置信 ${(value * 100).toFixed(0)}%`;
 }
 
 type StageState = "pending" | "running" | "completed";

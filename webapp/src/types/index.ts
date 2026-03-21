@@ -266,6 +266,9 @@ export interface RecommendationSuggestion {
   title: string;
   summary: string;
   action: string;
+  reason?: string;
+  confidence?: number;
+  issue_tags?: string[];
   kp_ids?: string[];
   doc_ids?: string[];
 }
