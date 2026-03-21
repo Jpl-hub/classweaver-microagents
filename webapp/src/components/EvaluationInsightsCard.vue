@@ -39,6 +39,38 @@
         </article>
       </div>
 
+      <div class="grid gap-3 sm:grid-cols-4">
+        <article class="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+          <p class="text-[11px] uppercase tracking-[0.25em] text-slate-400">知识点证据</p>
+          <p class="mt-1 text-2xl font-semibold text-slate-900">{{ evidenceCoverage.knowledge }}</p>
+          <p class="text-xs text-slate-500">带引用知识点 / 总知识点</p>
+        </article>
+        <article class="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+          <p class="text-[11px] uppercase tracking-[0.25em] text-slate-400">题目证据</p>
+          <p class="mt-1 text-2xl font-semibold text-slate-900">{{ evidenceCoverage.quiz }}</p>
+          <p class="text-xs text-slate-500">带引用题目 / 总题目</p>
+        </article>
+        <article class="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+          <p class="text-[11px] uppercase tracking-[0.25em] text-slate-400">练习证据</p>
+          <p class="mt-1 text-2xl font-semibold text-slate-900">{{ evidenceCoverage.practice }}</p>
+          <p class="text-xs text-slate-500">带 citation 练习 / 总练习</p>
+        </article>
+        <article class="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+          <p class="text-[11px] uppercase tracking-[0.25em] text-slate-400">检索填充</p>
+          <p class="mt-1 text-2xl font-semibold text-slate-900">{{ evidenceCoverage.retrieval }}</p>
+          <p class="text-xs text-slate-500">最终命中 / search_k</p>
+        </article>
+      </div>
+
+      <article class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+        <p class="text-[11px] uppercase tracking-[0.25em] text-slate-400">可信结论</p>
+        <ul class="mt-3 space-y-2 text-sm text-slate-700">
+          <li v-for="item in trustNarrative" :key="item" class="rounded-2xl border border-white/80 bg-white/80 px-3 py-2">
+            {{ item }}
+          </li>
+        </ul>
+      </article>
+
       <div class="grid gap-4 lg:grid-cols-2">
         <article class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
           <p class="text-[11px] uppercase tracking-[0.25em] text-slate-400">学习体验</p>
@@ -118,15 +150,41 @@
             <p class="mt-1 text-sm font-semibold text-slate-900">{{ reviewSummary.pending_multimodal_review ? "待接入" : "当前未触发" }}</p>
           </article>
         </div>
+        <div class="mt-3 grid gap-3 sm:grid-cols-2">
+          <article class="rounded-2xl border border-white/80 bg-white/80 p-3">
+            <p class="text-[11px] uppercase tracking-[0.2em] text-slate-400">采纳轮次</p>
+            <p class="mt-1 text-2xl font-semibold text-slate-900">{{ acceptedReviewCount }}</p>
+            <p class="text-xs text-slate-500">真正进入最终结果的 review 修正</p>
+          </article>
+          <article class="rounded-2xl border border-white/80 bg-white/80 p-3">
+            <p class="text-[11px] uppercase tracking-[0.2em] text-slate-400">拒绝轮次</p>
+            <p class="mt-1 text-2xl font-semibold text-slate-900">{{ rejectedReviewCount }}</p>
+            <p class="text-xs text-slate-500">被策略拒绝的负增益或低收益重跑</p>
+          </article>
+        </div>
         <ul class="mt-3 space-y-2 text-sm text-slate-700">
           <li v-for="cycle in reviewSummary.cycles || []" :key="cycle.round" class="rounded-2xl border border-white/80 bg-white/80 px-3 py-2">
-            第 {{ cycle.round }} 轮：{{ strategyLabel(cycle.strategy) }}，top_k {{ cycle.top_k }}，分数 {{ cycle.initial_overall_score ?? 0 }} -> {{ cycle.revised_overall_score ?? 0 }}
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="font-semibold text-slate-900">第 {{ cycle.round }} 轮：{{ strategyLabel(cycle.strategy) }}</span>
+              <span
+                class="rounded-full border px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.2em]"
+                :class="cycle.accepted ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'"
+              >
+                {{ cycle.accepted ? "已采纳" : "已拒绝" }}
+              </span>
+            </div>
+            <div class="mt-1">
+              top_k {{ cycle.top_k }}，分数 {{ cycle.initial_overall_score ?? 0 }} -> {{ cycle.revised_overall_score ?? 0 }}
+            </div>
             <span v-if="typeof cycle.score_delta === 'number'">（{{ cycle.score_delta >= 0 ? "+" : "" }}{{ cycle.score_delta }}）</span>
             <div v-if="cycle.query_text" class="mt-1 text-xs text-slate-500">
               query: {{ cycle.query_text }}
             </div>
             <div v-if="cycle.query_rewrite?.rationale" class="mt-1 text-xs text-slate-500">
               rewrite: {{ cycle.query_rewrite.rationale }}
+            </div>
+            <div v-if="cycle.decision_reason" class="mt-1 text-xs text-slate-500">
+              决策原因：{{ cycle.decision_reason }}
             </div>
           </li>
         </ul>
@@ -186,6 +244,7 @@ const verdictClass = computed(() => {
 });
 
 const ruleOverall = computed(() => props.evaluation?.rule_metrics?.scorecard?.overall ?? 0);
+const llmOverall = computed(() => props.evaluation?.scores?.overall ?? 0);
 
 const citationCoverage = computed(() => {
   const ratios = props.evaluation?.rule_metrics?.ratios ?? {};
@@ -209,6 +268,46 @@ const reflectionList = computed(() => {
 });
 
 const reviewSummary = computed(() => props.reviewSummary ?? null);
+const acceptedReviewCount = computed(() => (reviewSummary.value?.cycles ?? []).filter((cycle) => cycle.accepted).length);
+const rejectedReviewCount = computed(() => (reviewSummary.value?.cycles ?? []).filter((cycle) => cycle.accepted === false).length);
+
+const evidenceCoverage = computed(() => {
+  const counts = props.evaluation?.rule_metrics?.counts ?? {};
+  const retrieval = props.evaluation?.rule_metrics?.retrieval ?? {};
+  return {
+    knowledge: `${counts.knowledge_points_with_refs ?? 0}/${counts.knowledge_points ?? 0}`,
+    quiz: `${counts.quiz_items_with_refs ?? 0}/${counts.quiz_items ?? 0}`,
+    practice: `${counts.practice_items_with_citations ?? 0}/${counts.practice_items ?? 0}`,
+    retrieval: `${retrieval.final_hits ?? 0}/${retrieval.search_k ?? 0}`,
+  };
+});
+
+const trustNarrative = computed(() => {
+  const items: string[] = [];
+  const gates = props.evaluation?.rule_metrics?.gates ?? {};
+  const overallGap = llmOverall.value - ruleOverall.value;
+
+  if (Math.abs(overallGap) >= 15) {
+    items.push(`LLM 总评分与硬规则分相差 ${Math.abs(overallGap)}，这次结果需要优先看证据覆盖而不是只看总分。`);
+  } else {
+    items.push(`LLM 总评分与硬规则分差值 ${Math.abs(overallGap)}，当前主观判断与证据审计没有明显背离。`);
+  }
+  if (gates.needs_more_references) {
+    items.push("当前知识点或题目引用覆盖不足，结论还不够稳。");
+  } else {
+    items.push("知识点和题目引用覆盖基本过线，核心内容具备可追溯证据。");
+  }
+  if (gates.needs_more_retrieval) {
+    items.push("检索候选填充偏低，后续更值得先做补检索而不是盲目重写答案。");
+  }
+  if (gates.needs_more_practice) {
+    items.push("练习支持还不够，学习体验风险主要在承接和巩固，而不是知识点本身。");
+  }
+  if (acceptedReviewCount.value > 0 || rejectedReviewCount.value > 0) {
+    items.push(`当前 review 共采纳 ${acceptedReviewCount.value} 轮，拒绝 ${rejectedReviewCount.value} 轮，说明系统已经开始过滤低收益修正。`);
+  }
+  return items;
+});
 
 function strategyLabel(value?: string) {
   if (value === "tutor_only") return "定向补练习";

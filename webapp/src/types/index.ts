@@ -69,6 +69,8 @@ export interface ReviewCycleSummary {
   round: number;
   strategy?: string;
   query_text?: string;
+  accepted?: boolean;
+  decision_reason?: string;
   query_rewrite?: {
     query?: string;
     rationale?: string;
@@ -79,6 +81,7 @@ export interface ReviewCycleSummary {
   revised_overall_score?: number;
   score_delta?: number;
   retrieval_diagnostics?: RetrievalDiagnostics;
+  initial_evaluation?: QualityEvaluation;
   evaluation?: QualityEvaluation;
   reflection?: ReflectionInsights;
 }
