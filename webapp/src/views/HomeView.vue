@@ -187,6 +187,22 @@
                         </button>
                       </div>
                     </div>
+                    <div v-if="message.taskHint" class="space-y-2">
+                      <p class="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-400">结合你当前任务，建议这样接着走</p>
+                      <div class="rounded-2xl border border-slate-200/70 bg-white/75 p-3 text-xs text-slate-600">
+                        <p class="font-semibold text-slate-800">{{ message.taskHint.title }}</p>
+                        <p class="mt-1">{{ message.taskHint.summary }}</p>
+                        <div class="mt-3 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            class="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white transition hover:bg-slate-700"
+                            @click="runKnowledgeTaskHint(message.taskHint.action)"
+                          >
+                            {{ message.taskHint.actionLabel }}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </template>
                 <template v-else>
@@ -627,6 +643,7 @@ import {
   getActionStatusMap,
   setActionStatus,
 } from "../utils/actions";
+import { issueLabel } from "../utils/guidance";
 
 const STORAGE_KEY = "classweaver:last-prestudy";
 const CONVERSATION_STORAGE_KEY = "classweaver:last-conversation";
@@ -639,6 +656,12 @@ interface ChatMessage {
   text: string;
   kind?: "status" | "job" | "knowledge";
   qa?: KnowledgeQaResponse;
+  taskHint?: {
+    title: string;
+    summary: string;
+    action: "coach" | "quiz" | "knowledge" | "home";
+    actionLabel: string;
+  };
   created_at: number;
 }
 
@@ -1063,7 +1086,7 @@ async function handleKnowledgeQuery(query: string) {
       appendMessage("system", "知识库中没有找到相关内容。", "knowledge");
       return;
     }
-    appendMessage("system", resp.answer, "knowledge", resp);
+    appendMessage("system", resp.answer, "knowledge", resp, buildKnowledgeTaskHint(resp));
   } catch (error) {
     chatError.value = (error as Error).message;
   }
@@ -1129,7 +1152,13 @@ async function handleGenerateFromPpt(file: File) {
   }
 }
 
-function appendMessage(role: ChatMessage["role"], text: string, kind?: ChatMessage["kind"], qa?: KnowledgeQaResponse) {
+function appendMessage(
+  role: ChatMessage["role"],
+  text: string,
+  kind?: ChatMessage["kind"],
+  qa?: KnowledgeQaResponse,
+  taskHint?: ChatMessage["taskHint"],
+) {
   conversation.value = [
     ...conversation.value,
     {
@@ -1138,6 +1167,7 @@ function appendMessage(role: ChatMessage["role"], text: string, kind?: ChatMessa
       text,
       kind,
       qa,
+      taskHint,
       created_at: Date.now(),
     },
   ].slice(-MAX_CONVERSATION_LENGTH);
@@ -1147,6 +1177,61 @@ function appendMessage(role: ChatMessage["role"], text: string, kind?: ChatMessa
 function reuseSuggestedQuestion(prompt: string) {
   chatMode.value = "knowledge";
   chatInput.value = prompt;
+}
+
+function buildKnowledgeTaskHint(resp: KnowledgeQaResponse): ChatMessage["taskHint"] | undefined {
+  const primaryIssue = String(evaluationInsights.value?.primary_issue || "").trim();
+  const confidenceScore = resp.followup?.confidence?.score;
+
+  if (primaryIssue === "retrieval_gap" || primaryIssue === "evidence_gap") {
+    return {
+      title: `当前主问题是${issueLabel(primaryIssue)}，先把资料证据补稳`,
+      summary: "这次问答已经给了你一个方向，但当前整节课的主要风险仍是证据链不够稳。先回知识库或工作台补齐资料，再继续推进更值。",
+      action: "knowledge",
+      actionLabel: "去管理知识库",
+    };
+  }
+  if (primaryIssue === "tutoring_gap" || primaryIssue === "learner_fit_gap") {
+    return {
+      title: `当前更适合先做${issueLabel(primaryIssue)}修正`,
+      summary: "你已经问清了一个点，下一步更适合进入陪学助教，把这个知识点讲顺、练顺，而不是继续零散追问。",
+      action: "coach",
+      actionLabel: "进入陪学助教",
+    };
+  }
+  if (primaryIssue === "quiz_gap" || (typeof confidenceScore === "number" && confidenceScore >= 0.65 && job.value?.id)) {
+    return {
+      title: "这个问题已经可以进入一次小测校准",
+      summary: "答案和证据已经足够支撑做一轮短测，先检验自己会不会，比继续追问更能暴露真实薄弱点。",
+      action: "quiz",
+      actionLabel: "发起小测",
+    };
+  }
+  if (topRecommendations.value.length) {
+    return {
+      title: "先回工作台接着走下一步学习动作",
+      summary: "你当前已经有系统生成的学习建议，结合这次问答理解后，回到工作台按主线推进会更顺。",
+      action: "home",
+      actionLabel: "回到主线学习",
+    };
+  }
+  return undefined;
+}
+
+function runKnowledgeTaskHint(action: NonNullable<ChatMessage["taskHint"]>["action"]) {
+  if (action === "coach") {
+    openCoachMode();
+    return;
+  }
+  if (action === "quiz") {
+    void startQuizSession();
+    return;
+  }
+  if (action === "knowledge") {
+    openKnowledgeView();
+    return;
+  }
+  window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function persistConversation() {
