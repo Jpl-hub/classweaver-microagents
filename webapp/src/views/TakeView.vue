@@ -106,6 +106,12 @@
             <div class="rounded border border-slate-200 p-4 text-sm text-slate-600">
               <p class="text-xs uppercase text-slate-500">总结</p>
               <p class="mt-2">{{ result.review_card.summary }}</p>
+              <p v-if="result.review_card.next_step" class="mt-3 text-xs text-slate-500">
+                下一步：{{ result.review_card.next_step }}
+              </p>
+              <p v-if="result.review_card.rationale" class="mt-1 text-xs text-slate-400">
+                原因：{{ result.review_card.rationale }}
+              </p>
             </div>
           </div>
         </article>

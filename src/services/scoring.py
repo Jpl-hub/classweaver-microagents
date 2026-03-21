@@ -21,8 +21,25 @@ def _compute_review(kp_stats: Dict[str, Dict[str, int]]) -> Dict[str, Any]:
             strengths.append(kp)
         elif accuracy <= 0.5:
             focus.append(kp)
-    overall = "Solid understanding overall." if not focus else "Needs targeted review."
-    return {"strengths": strengths, "focus": focus, "summary": overall}
+    if focus:
+        summary = "需要做一轮定向复盘。"
+        next_step = "先回到薄弱知识点，再做一轮短测。"
+        rationale = f"当前主要薄弱点集中在 {', '.join(focus[:3])}。"
+    elif strengths:
+        summary = "当前掌握较稳，可以继续推进。"
+        next_step = "直接进入下一组知识点或更高难度练习。"
+        rationale = f"你在 {', '.join(strengths[:3])} 上表现稳定。"
+    else:
+        summary = "需要补一次基础梳理。"
+        next_step = "先快速回顾核心概念，再重新进入测验。"
+        rationale = "当前还没有形成稳定的优势知识点。"
+    return {
+        "strengths": strengths,
+        "focus": focus,
+        "summary": summary,
+        "next_step": next_step,
+        "rationale": rationale,
+    }
 
 
 def score_quiz(*, questions: List[Dict[str, Any]], answers: List[Dict[str, Any]]) -> Dict[str, Any]:

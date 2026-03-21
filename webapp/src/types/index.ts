@@ -193,6 +193,8 @@ export interface QuizSubmitResponse {
     strengths: string[];
     focus: string[];
     summary: string;
+    next_step?: string;
+    rationale?: string;
   };
   extra_questions?: QuizQuestion[];
 }

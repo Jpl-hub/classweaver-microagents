@@ -31,3 +31,5 @@ def test_score_quiz_returns_diagnostics():
     assert result["diagnostics"]["kp_stats"]["kp_math"]["correct"] == 1
     assert result["diagnostics"]["kp_stats"]["kp_geo"]["correct"] == 0
     assert result["review_card"]["focus"] == ["kp_geo"]
+    assert result["review_card"]["next_step"] == "先回到薄弱知识点，再做一轮短测。"
+    assert "kp_geo" in result["review_card"]["rationale"]
