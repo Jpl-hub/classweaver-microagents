@@ -116,6 +116,24 @@
           </div>
         </article>
 
+        <article class="rounded border border-slate-200 bg-white p-6 shadow-sm">
+          <p class="text-xs uppercase tracking-[0.3em] text-slate-500">下一步建议</p>
+          <h3 class="mt-1 text-lg font-semibold text-slate-800">{{ followupPlan.title }}</h3>
+          <p class="mt-2 text-sm text-slate-600">{{ followupPlan.summary }}</p>
+          <div class="mt-4 flex flex-wrap gap-3">
+            <button class="rounded bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800" @click="goFollowup">
+              {{ followupPlan.actionLabel }}
+            </button>
+            <button
+              v-if="followupPlan.target !== 'coach'"
+              class="rounded border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+              @click="router.push({ name: 'coach', query: { jobId } })"
+            >
+              去陪学助教
+            </button>
+          </div>
+        </article>
+
         <article class="rounded border border-slate-200 bg-white p-6 shadow-sm space-y-4">
           <header class="flex items-center justify-between">
             <h3 class="text-lg font-semibold text-slate-800">题目解析</h3>
@@ -159,8 +177,9 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import QuizCard from "../components/QuizCard.vue";
-import { submitQuiz } from "../services/api";
-import type { QuizQuestion, QuizSubmitResponse } from "../types";
+import { getPrestudyJob, submitQuiz } from "../services/api";
+import { buildQuizFollowup } from "../utils/guidance";
+import type { PrestudyResponse, QualityEvaluation, QuizQuestion, QuizSubmitResponse } from "../types";
 
 const SESSION_STORAGE_KEY = "classweaver:last-quiz-session";
 
@@ -179,6 +198,7 @@ const jobId = ref<string | undefined>(undefined);
 const questions = ref<QuizQuestion[]>([]);
 const answers = reactive<Record<string, string>>({});
 const sourceAction = ref<{ id?: string; title?: string; summary?: string } | null>(null);
+const linkedJob = ref<PrestudyResponse | null>(null);
 
 const isSubmitting = ref(false);
 const submitError = ref("");
@@ -190,6 +210,12 @@ const answeredCount = computed(() => Object.values(answers).filter((value) => va
 const unansweredCount = computed(() => Math.max(questions.value.length - answeredCount.value, 0));
 const completionPercent = computed(() =>
   questions.value.length ? (answeredCount.value / questions.value.length) * 100 : 0,
+);
+const followupPlan = computed(() =>
+  buildQuizFollowup(
+    result.value,
+    (((linkedJob.value?.final_json?.evaluation as Record<string, unknown> | undefined) ?? null) as QualityEvaluation | null),
+  ),
 );
 
 function setQuestions(list: QuizQuestion[]) {
@@ -284,10 +310,13 @@ onMounted(() => {
     } else if (stored && querySession && stored.sessionId !== querySession) {
       restoreHint.value = "发现历史测验，点击恢复";
     }
-    if (!hydrated && querySession) {
+  if (!hydrated && querySession) {
       sessionId.value = querySession;
       jobId.value = typeof route.query.jobId === "string" ? route.query.jobId : undefined;
     }
+  }
+  if (jobId.value) {
+    void hydrateLinkedJob(jobId.value);
   }
 });
 
@@ -329,5 +358,21 @@ async function handleSubmit() {
   } finally {
     isSubmitting.value = false;
   }
+}
+
+async function hydrateLinkedJob(id: string) {
+  try {
+    linkedJob.value = await getPrestudyJob(id);
+  } catch {
+    linkedJob.value = null;
+  }
+}
+
+function goFollowup() {
+  if (followupPlan.value.target === "coach" && jobId.value) {
+    router.push({ name: "coach", query: { jobId: jobId.value } });
+    return;
+  }
+  router.push({ name: "home" });
 }
 </script>
