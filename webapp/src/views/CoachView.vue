@@ -7,7 +7,7 @@
         </p>
         <h1 class="text-2xl font-semibold text-slate-900">陪学助教 · {{ jobTitle }}</h1>
         <p class="mt-2 text-sm text-slate-600">
-          Lumi 助教会按时间线一步步带你学习、讲解和测验，过程中可以随时提问或补充需求。
+          {{ coachIntro }}
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-3">
@@ -194,6 +194,19 @@ const coachFeedback = ref("");
 
 const jobTitle = computed(() => job.value?.lesson_plan?.title || "今日课堂");
 const activeScene = computed(() => scenes.value[activeIndex.value] ?? null);
+const coachIntro = computed(() => {
+  const issue = currentPrimaryIssue(job.value);
+  if (issue === "retrieval_gap" || issue === "evidence_gap") {
+    return "Lumi 会先帮你把证据和关键概念讲稳，再进入练习和测验，避免一开始就学偏。";
+  }
+  if (issue === "tutoring_gap" || issue === "learner_fit_gap") {
+    return "Lumi 会先用更轻的引导和练习带你进入状态，再逐步推进知识点和测验。";
+  }
+  if (issue === "quiz_gap") {
+    return "Lumi 会先帮你梳理知识点，再尽快用小测校准掌握度，避免后面建议失焦。";
+  }
+  return "Lumi 助教会按时间线一步步带你学习、讲解和测验，过程中可以随时提问或补充需求。";
+});
 const sceneProgress = computed(() => {
   if (!scenes.value.length) {
     return "0%";
@@ -287,6 +300,9 @@ function buildCoachScenes(payload: PrestudyResponse | null, timelinePayload: Les
   }
   const finalData = (payload.final_json ?? {}) as Record<string, unknown>;
   const plannerData = (payload.planner_json ?? {}) as Record<string, unknown>;
+  const evaluation = (finalData.evaluation as Record<string, unknown> | undefined) ?? {};
+  const primaryIssue = String(evaluation.primary_issue || "").trim();
+  const missingEvidence = asArray<string>(evaluation.missing_evidence);
   const knowledgePoints = asArray<KnowledgePoint>(finalData.knowledge_points ?? plannerData.knowledge_points);
   const practiceItems = asArray<PrintablePracticeItem>((finalData.tutor as Record<string, unknown>)?.practice);
   const quizBlock = finalData.quiz as Record<string, unknown> | undefined;
@@ -301,35 +317,31 @@ function buildCoachScenes(payload: PrestudyResponse | null, timelinePayload: Les
   scenes.push({
     id: "intro",
     title: "热身开场",
-    summary: overview,
-    mood: "warm",
+    summary: issueAwareOverview(primaryIssue, overview),
+    hints: buildIssueHints(primaryIssue, missingEvidence),
+    mood: primaryIssue === "quiz_gap" ? "quiz" : "warm",
     type: "intro",
   });
 
-  timelineEvents.forEach((event, idx) => {
-    scenes.push({
+  const timelineScenes = timelineEvents.map((event, idx) => ({
       id: `timeline-${event.id}`,
       title: formatEventTitle(event),
       summary: event.payload?.summary || event.payload?.note || "按这个步骤学习或讲解，如有疑问随时提问。",
       hints: [event.payload?.question, event.payload?.status, event.payload?.note].filter(Boolean).map(String).slice(0, 3),
       mood: idx % 2 === 0 ? "focus" : "idea",
       type: "timeline",
-    });
-  });
+    }));
 
-  knowledgePoints.forEach((kp, index) => {
-    scenes.push({
+  const conceptScenes = knowledgePoints.map((kp, index) => ({
       id: `kp-${kp.id ?? index}`,
       title: kp.title || `知识要点 ${index + 1}`,
       summary: kp.summary || "聚焦重点知识，留意概念之间的联系。",
       hints: kp.summary ? kp.summary.split(/；|。/).filter(Boolean).slice(0, 3) : undefined,
       mood: (timelineEvents.length + index) % 2 === 0 ? "focus" : "idea",
       type: "concept",
-    });
-  });
+    }));
 
-  practiceItems.forEach((item, index) => {
-    scenes.push({
+  const practiceScenes = practiceItems.map((item, index) => ({
       id: `practice-${index}`,
       title: item.prompt || `练习 ${index + 1}`,
       summary: item.answer
@@ -338,11 +350,11 @@ function buildCoachScenes(payload: PrestudyResponse | null, timelinePayload: Les
       hints: item.reasoning ? [item.reasoning] : undefined,
       mood: "idea",
       type: "practice",
-    });
-  });
+    }));
 
+  const quizScenes: CoachScene[] = [];
   if (quizBlock) {
-    scenes.push({
+    quizScenes.push({
       id: "quiz",
       title: "测验准备",
       summary: "准备好了吗？Lumi 会根据刚才的知识点生成自测题，检验掌握度。",
@@ -350,6 +362,15 @@ function buildCoachScenes(payload: PrestudyResponse | null, timelinePayload: Les
       type: "quiz",
       action: { label: "开启测验", type: "quiz" },
     });
+  }
+
+  for (const scene of orderScenesByIssue(primaryIssue, {
+    timeline: timelineScenes,
+    concept: conceptScenes,
+    practice: practiceScenes,
+    quiz: quizScenes,
+  })) {
+    scenes.push(scene);
   }
 
   scenes.push({
@@ -366,6 +387,51 @@ function buildCoachScenes(payload: PrestudyResponse | null, timelinePayload: Les
 
 function asArray<T>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : [];
+}
+
+function currentPrimaryIssue(payload: PrestudyResponse | null) {
+  return String((payload?.final_json?.evaluation as Record<string, unknown> | undefined)?.primary_issue || "").trim();
+}
+
+function issueAwareOverview(primaryIssue: string, fallback: string) {
+  const map: Record<string, string> = {
+    retrieval_gap: "这节内容里有些证据还不够稳，我们先把关键概念和出处讲清，再继续做题。",
+    evidence_gap: "这节内容的核心知识还需要再对准资料证据，我们先稳住概念再往下走。",
+    tutoring_gap: "这节课的难点不在知识点本身，而在怎么把它顺滑地学会，我们先用更轻的练习起步。",
+    learner_fit_gap: "Lumi 会先降低一点节奏和认知负荷，帮你把主线搭起来，再进入更完整的学习流程。",
+    quiz_gap: "这节课更需要尽快做一次校准测验，看看哪些点是真的会了，哪些只是看懂了。",
+  };
+  return map[primaryIssue] || fallback;
+}
+
+function buildIssueHints(primaryIssue: string, missingEvidence: string[]) {
+  const base = missingEvidence.slice(0, 2);
+  if (primaryIssue === "retrieval_gap" || primaryIssue === "evidence_gap") {
+    return [...base, "先留意概念依据和资料出处", "不急着刷题，先把核心事实讲稳"];
+  }
+  if (primaryIssue === "tutoring_gap" || primaryIssue === "learner_fit_gap") {
+    return ["先用短练习进入状态", "如果觉得节奏快，可以随时让 Lumi 放慢一点"];
+  }
+  if (primaryIssue === "quiz_gap") {
+    return ["先梳理主线知识点", "随后尽快用小测确认掌握度"];
+  }
+  return base;
+}
+
+function orderScenesByIssue(
+  primaryIssue: string,
+  buckets: { timeline: CoachScene[]; concept: CoachScene[]; practice: CoachScene[]; quiz: CoachScene[] },
+) {
+  if (primaryIssue === "retrieval_gap" || primaryIssue === "evidence_gap") {
+    return [...buckets.concept, ...buckets.timeline, ...buckets.practice, ...buckets.quiz];
+  }
+  if (primaryIssue === "tutoring_gap" || primaryIssue === "learner_fit_gap") {
+    return [...buckets.practice, ...buckets.concept, ...buckets.timeline, ...buckets.quiz];
+  }
+  if (primaryIssue === "quiz_gap") {
+    return [...buckets.concept, ...buckets.quiz, ...buckets.practice, ...buckets.timeline];
+  }
+  return [...buckets.timeline, ...buckets.concept, ...buckets.practice, ...buckets.quiz];
 }
 
 function formatEventTitle(event: LessonEventEntry): string {
